@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Create Exam{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <div style="max-width: 700px; margin: 2rem auto;">
+        
+        <!-- Enhanced card with better header styling -->
+        <div class="card">
+
+            <div class="card-header" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%); padding: 2rem; border-radius: 12px 12px 0 0;">
+                <h1 class="card-title" style="color: white; margin: 0;">Create New Exam</h1>
+                <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 0.9rem;">Set up a new examination with custom parameters</p>
+            </div>
+
+            <form method="POST" style="padding: 2rem;">
+                <div class="form-group">
+                    <label class="form-label">
+                        <span style="display: flex; align-items: center; gap: 0.5rem;">
+                            📝 Exam Title
+                            <span style="color: var(--danger-color);">*</span>
+                        </span>
+                    </label>
+                    <input type="text" name="title" class="form-input" required placeholder="e.g., Mid-term Examination" style="padding: 0.75rem; border-radius: 8px;">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <span style="display: flex; align-items: center; gap: 0.5rem;">
+                            📋 Description
+                        </span>
+                    </label>
+                    <textarea name="description" class="form-textarea" placeholder="Brief description of the exam..." style="padding: 0.75rem; border-radius: 8px; min-height: 100px;"></textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                                ⏱️ Duration (minutes)
+                                <span style="color: var(--danger-color);">*</span>
+                            </span>
+                        </label>
+                        <input type="number" name="duration_minutes" class="form-input" required min="1" value="60" style="padding: 0.75rem; border-radius: 8px;">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">
+                            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                                ✅ Passing Score (%)
+                                <span style="color: var(--danger-color);">*</span>
+                            </span>
+                        </label>
+                        <input type="number" name="passing_score" class="form-input" required min="0" max="100" value="50" step="0.1" style="padding: 0.75rem; border-radius: 8px;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1; padding: 0.75rem; border-radius: 8px; font-weight: 600;">Create Exam</button>
+                    <a href="{{ url_for('faculty_dashboard') }}" class="btn btn-primary" style="flex: 1; padding: 0.75rem; border-radius: 8px; text-align: center; text-decoration: none;">Cancel</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Added helpful tips section -->
+        <div class="card" style="margin-top: 2rem; background: var(--info-bg); border-left: 4px solid var(--info-color);">
+            <h3 style="margin-top: 0; color: var(--info-color);">💡 Tips for Creating Exams</h3>
+            <ul style="margin: 1rem 0; padding-left: 1.5rem; color: var(--text-secondary);">
+                <li>Set realistic duration based on number of questions</li>
+                <li>Passing score should reflect difficulty level</li>
+                <li>Add descriptive titles for easy identification</li>
+                <li>You can add questions after creating the exam</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

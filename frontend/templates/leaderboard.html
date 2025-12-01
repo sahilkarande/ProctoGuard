@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+
+
+{% block content %}
+<div class="container">
+<div class="welcome-section">
+    <h1>Global Leaderboard</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <a class="subtitle">
+            View overall performance and compare with peers in C-DAC.
+        </a>
+
+        <a href="javascript:history.back()" class="btn btn-outline">
+            ⬅ Back
+        </a>
+    </div>
+</div>
+
+
+
+    <!-- FLOATING COMPARE BUTTON -->
+    <button id="compare-btn" class="btn-primary"
+            style="position: fixed; bottom: 30px; right: 30px; padding: 16px 26px;
+                   font-size: 1.1rem; display:none; z-index:999;">
+        Compare (<span id="compare-count">0</span>)
+    </button>
+
+    <!-- FILTERS -->
+    <form method="GET" action="{{ url_for('global_leaderboard') }}" class="filter-bar" id="main-filter-form">
+        <div class="filter-col">
+            <a class="leaderheader">Start Date</a>
+            <input type="date" name="start" value="{{ start_date or '' }}">
+        </div>
+
+        <div class="filter-col">
+            <a class="leaderheader">End Date</a>
+            <input type="date" name="end" value="{{ end_date or '' }}">
+        </div>
+
+        <div class="filter-col">
+           <a class="leaderheader">Batch</a>
+            <select name="batch">
+                <option value="">All Batches</option>
+                {% for b in batches %}
+                <option value="{{ b }}" {% if request.args.get('batch') == b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="margin-left:auto; display:flex; gap:.6rem;">
+            <button class="btn btn-outline">Apply</button>
+            <a href="{{ url_for('global_leaderboard') }}" class="btn btn-outline" style="text-decoration:none;">Reset</a>
+        </div>
+    </form>
+
+
+    <!-- TABLE -->
+    <div class="leaderboard-card">
+        <table id="leaderboard-table">
+
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th class="sortable" data-col="1">PRN ⬍</th>
+                <th class="sortable" data-col="2">Name ⬍</th>
+                <th class="sortable" data-col="3">Exams ⬍</th>
+                <th class="sortable" data-col="4">Answered ⬍</th>
+                <th class="sortable" data-col="5">Marks ⬍</th>
+                <th class="sortable" data-col="6">Total ⬍</th>
+                <th class="sortable" data-col="7">% ⬍</th>
+                <th class="sortable" data-col="8">Behind Marks ⬍</th>
+                <th class="sortable" data-col="9">Behind Attempts ⬍</th>
+            </tr>
+
+            <tr class="column-filters">
+                <th></th>
+                <th><input data-col="1" class="col-filter-min" placeholder="🔍 PRN"></th>
+                <th><input data-col="2" class="col-filter-min" placeholder="🔍 Name"></th>
+                <th><input data-col="3" class="col-filter-min" placeholder="🔍 Min Exams"></th>
+                <th><input data-col="4" class="col-filter-min" placeholder="🔍 Min Ans."></th>
+                <th><input data-col="5" class="col-filter-min" placeholder="🔍 Min Marks"></th>
+                <th></th>
+                <th><input data-col="7" class="col-filter-min" placeholder="🔍 Min %"></th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+
+        <tbody >
+            {% for s in leaderboard %}
+            <tr>
+                <td >
+                    <input type="checkbox" class="compare-check"
+                        data-name="{{ s.name }}"
+                        data-prn="{{ s.prn }}"
+                        data-exams="{{ s.exams_attempted }}"
+                        data-ans="{{ s.total_questions }}"
+                        data-marks="{{ s.marks_obtained }}"
+                        data-perc="{{ s.percentage }}">
+                </td>
+
+                <td>{{ s.prn }}</td>
+                <td>{{ s.name }}</td>
+                <td>{{ s.exams_attempted }}</td>
+                <td>{{ s.total_questions }}</td>
+                <td>{{ s.marks_obtained }}</td>
+                <td>{{ s.possible_marks }}</td>
+                <td>{{ s.percentage }}</td>
+                <td>{{ s.behind_marks }}</td>
+                <td>{{ s.behind_attempts }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+        </table>
+    </div>
+
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+
+<div id="compare-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h2 class="modal-title">Compare Students</h2>
+
+        <div id="compare-content" class="modal-content"></div>
+
+        <button onclick="closeCompare()" class="btn-ghost modal-close-btn">Close</button>
+    </div>
+</div>
+
+
+
+<script>
+/* =========================
+   FILTER LOGIC
+========================= */
+function debounce(fn, delay=200){
+    let t;
+    return (...args)=>{
+        clearTimeout(t);
+        t = setTimeout(()=>fn(...args), delay);
+    };
+}
+
+function applyFilters(){
+    const rows = document.querySelectorAll("#leaderboard-table tbody tr");
+
+    const textFilters = [...document.querySelectorAll(".col-filter")].map(i=>({
+        col: +i.dataset.col,
+        val: i.value.trim().toLowerCase()
+    }));
+
+    const numFilters = [...document.querySelectorAll(".col-filter-min")].map(i=>({
+        col: +i.dataset.col,
+        val: i.value.trim()
+    }));
+
+    rows.forEach(row=>{
+        let show = true;
+
+        textFilters.forEach(f=>{
+            if (!f.val || !show) return;
+            const cell = row.children[f.col];
+            if (!cell) return;
+            if (!cell.innerText.toLowerCase().includes(f.val)) show = false;
+        });
+
+        numFilters.forEach(f=>{
+            if (!f.val || !show) return;
+            const cell = row.children[f.col];
+            if (!cell) return;
+            const num = parseFloat(cell.innerText.replace(/[^0-9.\-]/g,"")) || 0;
+            if (num < parseFloat(f.val)) show = false;
+        });
+
+        row.style.display = show ? "" : "none";
+    });
+}
+
+document.querySelectorAll(".col-filter, .col-filter-min")
+    .forEach(el=>el.addEventListener("input", debounce(applyFilters, 160)));
+
+
+/* =========================
+   COLUMN SORTING
+========================= */
+document.querySelectorAll(".sortable").forEach(th => {
+    th.addEventListener("click", () => {
+        const col = parseInt(th.dataset.col);
+        const table = document.querySelector("#leaderboard-table tbody");
+        const rows = Array.from(table.querySelectorAll("tr"));
+
+        const asc = !th.classList.contains("asc");
+        document.querySelectorAll(".sortable").forEach(h => h.classList.remove("asc", "desc"));
+
+        th.classList.add(asc ? "asc" : "desc");
+
+        rows.sort((a, b) => {
+            const va = a.children[col].innerText.trim();
+            const vb = b.children[col].innerText.trim();
+
+            const na = parseFloat(va.replace(/[^0-9.-]/g,""));
+            const nb = parseFloat(vb.replace(/[^0-9.-]/g,""));
+
+            if (!isNaN(na) && !isNaN(nb))
+                return asc ? na - nb : nb - na;
+
+            return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+
+        rows.forEach(r => table.appendChild(r));
+    });
+});
+
+
+/* =========================
+   MULTI-STUDENT COMPARISON
+========================= */
+const compareBtn = document.getElementById("compare-btn");
+const compareCount = document.getElementById("compare-count");
+const modal = document.getElementById("compare-modal");
+const modalContent = document.getElementById("compare-content");
+
+document.querySelectorAll(".compare-check").forEach(chk => {
+    chk.addEventListener("change", () => {
+        const selected = document.querySelectorAll(".compare-check:checked").length;
+
+        compareCount.innerText = selected;
+        compareBtn.style.display = selected >= 2 ? "block" : "none";
+    });
+});
+
+compareBtn.addEventListener("click", () => {
+    const selected = [...document.querySelectorAll(".compare-check:checked")];
+
+    let html = `<table style="width:100%; border-collapse:collapse; color:white;">
+                    <tr>
+                        <th>Name</th>
+                        <th>PRN</th>
+                        <th>Exams</th>
+                        <th>Answered</th>
+                        <th>Marks</th>
+                        <th>%</th>
+                    </tr>`;
+
+    selected.forEach(s => {
+        html += `
+            <tr>
+                <td>${s.dataset.name}</td>
+                <td>${s.dataset.prn}</td>
+                <td>${s.dataset.exams}</td>
+                <td>${s.dataset.ans}</td>
+                <td>${s.dataset.marks}</td>
+                <td>${s.dataset.perc}%</td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+    modalContent.innerHTML = html;
+    modal.style.display = "flex";
+});
+
+function closeCompare(){
+   modal.style.display = "none";
+
+}
+</script>
+
+{% endblock %}

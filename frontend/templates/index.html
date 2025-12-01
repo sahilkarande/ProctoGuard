@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}CDAC Proctored Exam Platform{% endblock %}
+
+{% block content %}
+<div class="container">
+    <main>
+        <section class="hero">
+            <div class="cdac-logo-group">
+                <img 
+                    id="cdac-logo"
+                    src="static/images/Lite_Theme_logo.png"  
+                    alt="CDAC Logo"
+                    class="cdac-logo-english"
+                >
+                <div class="logo-stack">
+                    <img src="static/images/applogo.png" alt="ProctoGuard Logo" class="proctoguard-logo">
+                </div>
+            </div>
+            
+            <a class="applogo">ProctoGuard</a> <br>
+            <a class="appdesc">AI-powered online examination system designed for educational excellence</a>
+        </section>
+    </main>
+
+    <section class="grid grid-3 mt-4">
+        <div class="card text-center feature-card">
+            <div class="feature-icon">🤖</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">AI Enhancement</h3>
+            <p style="color: var(--text-secondary);">Automatically refine and format questions with AI for clarity and accuracy</p>
+        </div>
+        
+        <div class="card text-center feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Secure Proctoring</h3>
+            <p style="color: var(--text-secondary);">Advanced monitoring to ensure exam integrity and prevent malpractice</p>
+        </div>
+        
+        <div class="card text-center feature-card">
+            <div class="feature-icon">📊</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Analytics Dashboard</h3>
+            <p style="color: var(--text-secondary);">Track performance with detailed visual reports for students and faculty</p>
+        </div>
+
+        <div class="card text-center feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Real-Time Results</h3>
+            <p style="color: var(--text-secondary);">Instant evaluation and insights for every participant</p>
+        </div>
+
+        <div class="card text-center feature-card">
+            <div class="feature-icon">🌐</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Cloud-Based Access</h3>
+            <p style="color: var(--text-secondary);">Seamless access anywhere with secure cloud deployment</p>
+        </div>
+
+        <div class="card text-center feature-card">
+            <div class="feature-icon">📱</div>
+            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Mobile Friendly</h3>
+            <p style="color: var(--text-secondary);">Fully responsive interface for desktop, tablet, and mobile devices</p>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="card mt-4">
+        <div class="card-header">
+            <h2 class="card-title">Platform Highlights</h2>
+            <p class="card-subtitle">Tailored for institutions and learners alike</p>
+        </div>
+        
+        <div class="grid grid-2">
+            <div>
+                <h3 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem;">For Faculty</h3>
+                <ul style="list-style: none; color: var(--text-secondary);">
+                    <li>✅ Intuitive exam creation and question management</li>
+                    <li>✅ Upload questions via CSV, Excel, or JSON</li>
+                    <li>✅ AI-powered question enhancement</li>
+                    <li>✅ View activity logs and suspicious events</li>
+                    <li>✅ Download analytics and performance PDFs</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h3 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem;">For Students</h3>
+                <ul style="list-style: none; color: var(--text-secondary);">
+                    <li>✅ Simple, distraction-free exam interface</li>
+                    <li>✅ Auto-save answers with countdown timer</li>
+                    <li>✅ Instant result generation</li>
+                    <li>✅ Compare performance with class average</li>
+                    <li>✅ Download detailed performance reports</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="margin-top: 3rem; text-align: center; padding: 1.5rem 0; color: var(--text-secondary); border-top: 1px solid var(--border-color);">
+        <p>CDAC Education & Training Department | All Rights Reserved</p>
+        <p style="font-size: 0.9rem;">Empowering digital learning through innovation and technology</p>
+    </footer>
+
+</div>
+
+<script>
+
+    window.addEventListener('DOMContentLoaded', (event) => {
+        const logoImage = document.getElementById('cdac-logo');
+
+        if (currentTheme === 'dark') {
+            logoImage.src = 'static/images/Dark_Theme_logo.png';
+        } else if (currentTheme === 'light') {
+            logoImage.src = 'static/images/Lite_Theme_logo.png';
+        }
+
+
+        document.documentElement.setAttribute('data-theme', currentTheme);
+    });
+</script>
+
+{% endblock %}

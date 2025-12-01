@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.title }} - Secure Exam Mode{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/exam.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="exam-header">
+    <div class="header-content">
+        <div class="exam-info">
+            <h1 class="exam-title">{{ exam.title }}</h1>
+            <span class="exam-subtitle">Secure Proctored Examination</span>
+        </div>
+        <div class="exam-status">
+            <div class="status-card">
+                <span class="status-label">Time Remaining</span>
+                <span id="header-timer" class="status-value">00:00:00</span>
+            </div>
+            <div class="status-card tab-status">
+                <span class="status-label">Tab Switches</span>
+                <span id="tab-count" class="status-value">0 / {{ exam.max_tab_switches or 3 }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Container -->
+<main class="exam-container">
+    <!-- Instructions Panel -->
+    <div class="instructions-panel">
+        <div class="panel-header">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <h2>Exam Instructions</h2>
+        </div>
+        <ul class="instructions-list">
+            <li>
+                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                </svg>
+                Stay in fullscreen mode throughout the exam duration
+            </li>
+            <li>
+                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                </svg>
+                Do not switch tabs or windows during the examination
+            </li>
+            <li>
+                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                </svg>
+                All answers are automatically saved in real-time
+            </li>
+            <li>
+                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                </svg>
+                Unanswered questions will be marked as <strong>incorrect (0 points)</strong>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Exam Form -->
+    <form id="exam-form" class="exam-form">
+        {% for question in questions %}
+        <article class="question-card" data-qid="{{ question.id }}">
+            <div class="question-header">
+                <span class="question-number">Question {{ loop.index }}</span>
+                <span class="question-count">{{ loop.index }} of {{ questions|length }}</span>
+            </div>
+            
+            <div class="question-text">{{ question.question_text|safe }}</div>
+            
+            <div class="options">
+                <!-- Option A -->
+                {% if question.option_a %}
+                <label class="option {% if existing_answers.get(question.id) == 'A' %}selected{% endif %}">
+                    <input type="radio"
+                        name="question_{{ question.id }}"
+                        value="A"
+                        data-question-id="{{ question.id }}"
+                        {% if existing_answers.get(question.id) == 'A' %}checked{% endif %}>
+                    <span class="option-letter">A</span>
+                    <span class="option-text">{{ question.option_a|safe }}</span>
+                    <span class="option-checkmark">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                    </span>
+                </label>
+                {% endif %}
+
+                <!-- Option B -->
+                {% if question.option_b %}
+                <label class="option {% if existing_answers.get(question.id) == 'B' %}selected{% endif %}">
+                    <input type="radio"
+                        name="question_{{ question.id }}"
+                        value="B"
+                        data-question-id="{{ question.id }}"
+                        {% if existing_answers.get(question.id) == 'B' %}checked{% endif %}>
+                    <span class="option-letter">B</span>
+                    <span class="option-text">{{ question.option_b|safe }}</span>
+                    <span class="option-checkmark">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                    </span>
+                </label>
+                {% endif %}
+
+                <!-- Option C -->
+                {% if question.option_c %}
+                <label class="option {% if existing_answers.get(question.id) == 'C' %}selected{% endif %}">
+                    <input type="radio"
+                        name="question_{{ question.id }}"
+                        value="C"
+                        data-question-id="{{ question.id }}"
+                        {% if existing_answers.get(question.id) == 'C' %}checked{% endif %}>
+                    <span class="option-letter">C</span>
+                    <span class="option-text">{{ question.option_c|safe }}</span>
+                    <span class="option-checkmark">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                    </span>
+                </label>
+                {% endif %}
+
+                <!-- Option D -->
+                {% if question.option_d %}
+                <label class="option {% if existing_answers.get(question.id) == 'D' %}selected{% endif %}">
+                    <input type="radio"
+                        name="question_{{ question.id }}"
+                        value="D"
+                        data-question-id="{{ question.id }}"
+                        {% if existing_answers.get(question.id) == 'D' %}checked{% endif %}>
+                    <span class="option-letter">D</span>
+                    <span class="option-text">{{ question.option_d|safe }}</span>
+                    <span class="option-checkmark">
+                        <svg viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                    </span>
+                </label>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+
+        <button type="button" id="submit-btn" class="submit-button">
+            <svg class="button-icon" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+            </svg>
+            Submit Exam
+        </button>
+    </form>
+</main>
+
+<!-- Proctor Badge -->
+<div class="proctor-badge">
+    <svg class="shield-icon" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+    </svg>
+    <span>Proctored Mode Active</span>
+</div>
+
+<!-- Fullscreen Overlay -->
+<div id="fs-overlay" class="fullscreen-overlay">
+    <div class="overlay-content">
+        <div class="overlay-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 7h4v4M17 7h-4v4M7 17h4v-4M17 17h-4v-4"/>
+            </svg>
+        </div>
+        <h1 class="overlay-title">Fullscreen Required</h1>
+        <p class="overlay-message">Please enter fullscreen mode to continue your examination. This ensures a distraction-free testing environment.</p>
+        <button id="fs-enter-btn" class="fullscreen-button">
+            <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 7h4v4M17 7h-4v4M7 17h4v-4M17 17h-4v-4"/>
+            </svg>
+            Enter Fullscreen Mode
+        </button>
+    </div>
+</div>
+
+<!-- Hidden Submit Form -->
+<form id="submit-form" method="POST" action="{{ url_for('submit_exam', student_exam_id=student_exam.id) }}"></form>
+
+<script src="{{ url_for('static', filename='js/exam.js') }}?v=2"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("🎓 Initializing exam...");
+    console.log("Student Exam ID:", {{ student_exam.id }});
+    console.log("Time Remaining (minutes):", {{ time_remaining }});
+    
+    initExam({
+        studentExamId: {{ student_exam.id }},
+        timeRemaining: {{ time_remaining }},  // This is in MINUTES
+        maxTabSwitches: {{ exam.max_tab_switches or 3 }},
+        initialTabSwitchCount: {{ student_exam.tab_switch_count or 0 }},
+        showTabSwitches: true
+    });
+});
+</script>
+{% endblock %}

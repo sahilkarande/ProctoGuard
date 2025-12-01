@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% block title %}Student Report | Faculty{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <h1>📊 Student Report Generator</h1>
+   
+  </div>
+
+  <!-- Main Filters -->
+  <form method="GET" action="{{ url_for('faculty_student_report') }}" class="filter-form">
+    <div class="filter-group">
+      <label for="batch">🎓 Select Batch</label>
+      <select name="batch" id="batch" required>
+        <option value="">-- Select Batch --</option>
+        {% for batch in batches %}
+        <option value="{{ batch }}" {% if batch == selected_batch %}selected{% endif %}>{{ batch }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="exam">📝 Select Exam(s)</label>
+      <select name="exam_ids" id="exam" multiple required>
+        {% for exam in exams %}
+        <option value="{{ exam.id }}" {% if exam.id in selected_exam_ids %}selected{% endif %}>{{ exam.title }}</option>
+        {% endfor %}
+      </select>
+      <span class="hint">Hold <strong>Ctrl</strong> / <strong>Cmd</strong> to select multiple exams</span>
+    </div>
+
+    <div class="filter-actions">
+      <button type="submit" class="generate-btn">
+        <i class="bi bi-bar-chart-fill"></i> Generate Report
+      </button>
+    </div>
+  </form>
+
+  {% if report_data %}
+  
+  <!-- Summary Box -->
+  <div class="summary-box">
+    <h3>📊 Summary</h3>
+    <ul>
+      <li><strong>Total Students:</strong> {{ summary.total_students }}</li>
+      <li><strong>Appeared:</strong> {{ summary.appeared }}</li>
+      <li><strong>Passed:</strong> {{ summary.passed }}</li>
+      <li><strong>Failed:</strong> {{ summary.failed }}</li>
+      <li><strong>Absent:</strong> {{ summary.absent }}</li>
+      <li><strong>Average Marks:</strong> {{ "%.2f"|format(summary.average_marks) }}</li>
+      <li><strong>Pass Percentage:</strong> {{ "%.2f"|format(summary.pass_percentage) }}%</li>
+    </ul>
+  </div>
+
+  <!-- Table Filters -->
+  <div class="table-filters">
+    <div class="table-filters-grid">
+      <div class="filter-input-group">
+        <label for="filter-prn">🔍 Filter by PRN</label>
+        <input type="text" id="filter-prn" class="filter-input" placeholder="Search PRN...">
+      </div>
+      
+      <div class="filter-input-group">
+        <label for="filter-name">🔍 Filter by Name</label>
+        <input type="text" id="filter-name" class="filter-input" placeholder="Search name...">
+      </div>
+      
+      <div class="filter-input-group">
+        <label for="filter-min-total">📊 Min Total Marks</label>
+        <input type="number" id="filter-min-total" class="filter-input" placeholder="Min marks..." step="0.01">
+      </div>
+      
+      <div class="filter-input-group">
+        <label for="filter-max-total">📊 Max Total Marks</label>
+        <input type="number" id="filter-max-total" class="filter-input" placeholder="Max marks..." step="0.01">
+      </div>
+      
+      <div class="filter-input-group">
+        <label for="filter-min-percentage">📈 Min Percentage</label>
+        <input type="number" id="filter-min-percentage" class="filter-input" placeholder="Min %..." step="0.01">
+      </div>
+      
+      <div class="filter-input-group">
+        <label for="filter-status">✅ Result Status</label>
+        <select id="filter-status" class="filter-input">
+          <option value="">All Students</option>
+          <option value="pass">Passed Only</option>
+          <option value="fail">Failed Only</option>
+          <option value="absent">Absent Only</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="filter-actions-bar">
+      <button type="button" class="filter-btn filter-btn-clear" onclick="clearAllFilters()">
+        🗑️ Clear Filters
+      </button>
+      <button type="button" class="filter-btn filter-btn-export" onclick="exportFilteredData()">
+        📥 Export Filtered (CSV)
+      </button>
+      <span class="result-count" id="result-count"></span>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <div class="result-count" id="visible-count">
+      Showing <strong id="visible-rows">0</strong> of <strong id="total-rows">0</strong> students
+    </div>
+    <a href="{{ url_for('faculty_student_report_pdf_multi', batch_name=selected_batch, exam_ids=','.join(selected_exam_ids|map('string'))) }}" class="download-btn">
+      <i class="bi bi-file-earmark-pdf"></i> Download PDF
+    </a>
+  </div>
+
+  <!-- Data Table -->
+  <div class="table-container">
+    <h2 style="margin-bottom:1rem;">📘 PG-DBDA {{ selected_batch }} – Exam Report</h2>
+    <table class="table" id="report-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-column="0">PRN Number</th>
+          <th class="sortable" data-column="1">Student Name</th>
+          {% for exam_title in exam_titles %}
+          <th class="sortable" data-column="{{ loop.index + 1 }}">{{ exam_title }}</th>
+          {% endfor %}
+          <th class="sortable" data-column="{{ exam_titles|length + 2 }}">Total Marks</th>
+          <th class="sortable" data-column="{{ exam_titles|length + 3 }}">Percentage (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in report_data %}
+        <tr data-prn="{{ student.prn_number or '' }}" 
+            data-name="{{ student.full_name or 'Unnamed' }}" 
+            data-total="{{ student.total_marks }}"
+            data-percentage="{{ student.percentage }}"
+            data-status="{{ 'pass' if student.percentage >= 50 else 'fail' if student.total_marks > 0 else 'absent' }}">
+          <td>{{ student.prn_number or '-' }}</td>
+          <td style="text-align: left;">{{ student.full_name or 'Unnamed' }}</td>
+          {% for marks in student.exam_marks %}
+          <td class="marks-cell {% if marks == 'Absent' %}{% elif marks|float >= 50 %}marks-pass{% else %}marks-fail{% endif %}">
+            {{ marks }}
+          </td>
+          {% endfor %}
+          <td class="marks-cell total-marks">{{ "%.2f"|format(student.total_marks) }}</td>
+          <td class="percentage-cell {% if student.percentage >= 50 %}marks-pass{% else %}marks-fail{% endif %}">
+            {{ "%.2f"|format(student.percentage) }}%
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif selected_batch %}
+  <div class="empty-state">
+    <i class="bi bi-exclamation-circle" style="font-size:2rem;"></i>
+    <p>No data available for this selection.</p>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-clipboard-data" style="font-size:2rem;"></i>
+    <p>Select a batch and exams to view student performance.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// ============================================================================
+// TABLE SORTING AND FILTERING
+// ============================================================================
+
+let currentSort = { column: null, direction: 'asc' };
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  updateRowCounts();
+  attachSortListeners();
+  attachFilterListeners();
+});
+
+// ============================================================================
+// SORTING FUNCTIONALITY
+// ============================================================================
+
+function attachSortListeners() {
+  const headers = document.querySelectorAll('.table th.sortable');
+  headers.forEach(header => {
+    header.addEventListener('click', function() {
+      const column = parseInt(this.dataset.column);
+      sortTable(column);
+    });
+  });
+}
+
+function sortTable(columnIndex) {
+  const table = document.getElementById('report-table');
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr:not(.filtered-out)'));
+  
+  // Determine sort direction
+  if (currentSort.column === columnIndex) {
+    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort.column = columnIndex;
+    currentSort.direction = 'asc';
+  }
+  
+  // Sort rows
+  rows.sort((a, b) => {
+    let aValue = a.cells[columnIndex].textContent.trim();
+    let bValue = b.cells[columnIndex].textContent.trim();
+    
+    // Handle numeric columns
+    if (columnIndex >= 2) {
+      aValue = parseFloat(aValue.replace(/[^0-9.-]/g, '')) || 0;
+      bValue = parseFloat(bValue.replace(/[^0-9.-]/g, '')) || 0;
+      return currentSort.direction === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+    
+    // Handle text columns
+    if (currentSort.direction === 'asc') {
+      return aValue.localeCompare(bValue);
+    } else {
+      return bValue.localeCompare(aValue);
+    }
+  });
+  
+  // Re-append rows in sorted order
+  rows.forEach(row => tbody.appendChild(row));
+  
+  // Update header indicators
+  updateSortIndicators(columnIndex);
+}
+
+function updateSortIndicators(activeColumn) {
+  const headers = document.querySelectorAll('.table th.sortable');
+  headers.forEach((header, index) => {
+    header.classList.remove('sort-asc', 'sort-desc');
+    if (parseInt(header.dataset.column) === activeColumn) {
+      header.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+}
+
+// ============================================================================
+// FILTERING FUNCTIONALITY
+// ============================================================================
+
+function attachFilterListeners() {
+  const filterInputs = document.querySelectorAll('.filter-input');
+  filterInputs.forEach(input => {
+    input.addEventListener('input', applyFilters);
+    input.addEventListener('change', applyFilters);
+  });
+}
+
+function applyFilters() {
+  const filterPRN = document.getElementById('filter-prn').value.toLowerCase();
+  const filterName = document.getElementById('filter-name').value.toLowerCase();
+  const filterMinTotal = parseFloat(document.getElementById('filter-min-total').value) || -Infinity;
+  const filterMaxTotal = parseFloat(document.getElementById('filter-max-total').value) || Infinity;
+  const filterMinPercentage = parseFloat(document.getElementById('filter-min-percentage').value) || -Infinity;
+  const filterStatus = document.getElementById('filter-status').value;
+  
+  const table = document.getElementById('report-table');
+  const rows = table.querySelectorAll('tbody tr');
+  
+  let visibleCount = 0;
+  
+  rows.forEach(row => {
+    const prn = row.dataset.prn.toLowerCase();
+    const name = row.dataset.name.toLowerCase();
+    const total = parseFloat(row.dataset.total) || 0;
+    const percentage = parseFloat(row.dataset.percentage) || 0;
+    const status = row.dataset.status;
+    
+    const matchPRN = !filterPRN || prn.includes(filterPRN);
+    const matchName = !filterName || name.includes(filterName);
+    const matchMinTotal = total >= filterMinTotal;
+    const matchMaxTotal = total <= filterMaxTotal;
+    const matchMinPercentage = percentage >= filterMinPercentage;
+    const matchStatus = !filterStatus || status === filterStatus;
+    
+    if (matchPRN && matchName && matchMinTotal && matchMaxTotal && matchMinPercentage && matchStatus) {
+      row.classList.remove('filtered-out');
+      visibleCount++;
+    } else {
+      row.classList.add('filtered-out');
+    }
+  });
+  
+  updateRowCounts();
+}
+
+function clearAllFilters() {
+  document.getElementById('filter-prn').value = '';
+  document.getElementById('filter-name').value = '';
+  document.getElementById('filter-min-total').value = '';
+  document.getElementById('filter-max-total').value = '';
+  document.getElementById('filter-min-percentage').value = '';
+  document.getElementById('filter-status').value = '';
+  
+  const rows = document.querySelectorAll('.table tbody tr');
+  rows.forEach(row => row.classList.remove('filtered-out'));
+  
+  updateRowCounts();
+}
+
+function updateRowCounts() {
+  const totalRows = document.querySelectorAll('.table tbody tr').length;
+  const visibleRows = document.querySelectorAll('.table tbody tr:not(.filtered-out)').length;
+  
+  const totalElement = document.getElementById('total-rows');
+  const visibleElement = document.getElementById('visible-rows');
+  
+  if (totalElement) totalElement.textContent = totalRows;
+  if (visibleElement) visibleElement.textContent = visibleRows;
+}
+
+// ============================================================================
+// EXPORT FILTERED DATA
+// ============================================================================
+
+function exportFilteredData() {
+  const table = document.getElementById('report-table');
+  const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+  const visibleRows = Array.from(table.querySelectorAll('tbody tr:not(.filtered-out)'));
+  
+  let csv = headers.join(',') + '\n';
+  
+  visibleRows.forEach(row => {
+    const cells = Array.from(row.cells).map(cell => {
+      let text = cell.textContent.trim();
+      // Escape commas and quotes
+      if (text.includes(',') || text.includes('"')) {
+        text = '"' + text.replace(/"/g, '""') + '"';
+      }
+      return text;
+    });
+    csv += cells.join(',') + '\n';
+  });
+  
+  // Download CSV
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `student_report_${new Date().getTime()}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+</script>
+
+{% endblock %}

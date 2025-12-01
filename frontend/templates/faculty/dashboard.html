@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Faculty Dashboard{% endblock %}
+
+{% block content %}
+
+
+<div class="container">
+    <!-- Dashboard Header -->
+    <div style="margin-bottom: 2rem;">
+        <div class="flex-between mb-4">
+            <div>
+                <a class="facultyheader" >📊 Faculty Dashboard</a> <br>
+                <a style="color: var(--text-secondary);">Manage your exams and monitor student performance</a>
+            </div>
+<div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+    <a href="{{ url_for('create_exam') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Create New Exam
+    </a>
+
+    <a href="{{ url_for('faculty_student_list') }}" class="btn btn-primary">
+        <i class="bi bi-people"></i> Manage Students
+    </a>
+
+    <a href="{{ url_for('faculty_student_report') }}" class="btn btn-primary">
+        <i class="bi bi-graph-up"></i> Student Report
+    </a>
+</div>
+
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card">
+            <div class="stat-value">{{ exams|length }}</div>
+            <div class="stat-label">Total Exams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ exams|selectattr('is_active')|list|length }}</div>
+            <div class="stat-label">Active Exams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ exams|map(attribute='questions')|map('length')|sum }}</div>
+            <div class="stat-label">Total Questions</div>
+        </div>
+    </div>
+
+    <!-- Exams Table -->
+    {% if exams %}
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Your Exams</h2>
+        </div>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Questions</th>
+                    <th>Duration</th>
+                    <th>Passing Score</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exam in exams %}
+                <tr>
+                    <td><strong>{{ exam.title }}</strong></td>
+                    <td>
+                        <span style="background: rgba(99, 102, 241, 0.1); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem;">
+                            {{ exam.questions|length }} questions
+                        </span>
+                    </td>
+                    <td>{{ exam.duration_minutes }} min</td>
+                    <td>{{ exam.passing_score }}%</td>
+                    <td>
+                        {% if exam.is_active %}
+                        <span class="badge badge-success">✓ Active</span>
+                        {% else %}
+                        <span class="badge badge-danger">✗ Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.9rem; color: var(--text-secondary);">{{ exam.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <a href="{{ url_for('view_exam', exam_id=exam.id) }}" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">View</a>
+                            <a href="{{ url_for('exam_analytics', exam_id=exam.id) }}" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Analytics</a>
+
+                            <form method="POST" action="{{ url_for('delete_exam', exam_id=exam.id) }}" onsubmit="return confirm('Are you sure you want to delete this exam? This action cannot be undone.')">
+                                <button type="submit" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">🗑️ Delete</button>
+                            </form>
+                        </div>
+
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card text-center">
+        <div style="padding: 3rem 0;">
+            <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">📭 No exams yet</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Create your first exam to get started!</p>
+            <a href="{{ url_for('create_exam') }}" class="btn btn-primary btn-lg">Create Exam</a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("toggleConsoleBtn");
+    const consoleBody = document.getElementById("sqlConsoleBody");
+    const runBtn = document.getElementById("runSqlBtn");
+    const clearBtn = document.getElementById("clearSqlBtn");
+    const output = document.getElementById("sqlOutput");
+    const queryInput = document.getElementById("sqlQuery");
+
+    if (!toggleBtn) return;
+
+    // Toggle visibility
+    toggleBtn.addEventListener("click", () => {
+        consoleBody.style.display = (consoleBody.style.display === "none") ? "block" : "none";
+    });
+
+    // Clear query
+    clearBtn.addEventListener("click", () => {
+        queryInput.value = "";
+        output.innerHTML = "";
+    });
+
+    // Execute SQL query
+    runBtn.addEventListener("click", async () => {
+        const sql = queryInput.value.trim();
+        if (!sql) {
+            output.innerHTML = "<div style='color:red;'>⚠️ Please enter a SQL query.</div>";
+            return;
+        }
+
+        output.innerHTML = "⏳ Running query...";
+        try {
+            const response = await fetch("/admin/sql_console/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sql }),
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                output.innerHTML = `<div style='color:red;'>❌ Error: ${data.error}</div>`;
+                return;
+            }
+
+            if (data.type === "select") {
+                // Render table
+                let html = `<div style='margin-bottom:0.5rem;'>✅ Query OK - ${data.rowcount} row(s) returned</div>`;
+                html += `<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;font-size:0.9rem;'>`;
+                html += "<tr style='background:#f3f4f6;'>";
+                data.columns.forEach(col => html += `<th>${col}</th>`);
+                html += "</tr>";
+                data.rows.forEach(row => {
+                    html += "<tr>";
+                    data.columns.forEach(col => html += `<td>${row[col]}</td>`);
+                    html += "</tr>";
+                });
+                html += "</table>";
+                output.innerHTML = html;
+            } else {
+                output.innerHTML = `<div style='color:green;'>${data.message}</div>`;
+            }
+        } catch (err) {
+            output.innerHTML = `<div style='color:red;'>❌ ${err.message}</div>`;
+        }
+    });
+});
+</script>
+{% endblock %}

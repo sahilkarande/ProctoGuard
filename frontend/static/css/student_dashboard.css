@@ -1,0 +1,323 @@
+:root {
+  --bg: #0c1020;
+  --surface: #181b2e;
+  --card: #1d2035;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --accent: linear-gradient(135deg, #6366f1, #3b82f6);
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius: 16px;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  --glass: rgba(255, 255, 255, 0.08);
+}
+
+/* Page Layout */
+body {
+  background: var(--bg);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: var(--text);
+}
+
+
+/* Welcome Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: -7rem;
+}
+
+
+
+.welcome-section h1 {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin: 0;
+}
+
+.profile-avatar {
+  background: var(--accent);
+  color: #fff;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1.5rem;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow);
+}
+
+  /* Info Card */
+  .info-card {
+    display: flex;
+    gap: 1rem;
+    padding: 0.9rem;
+    border-radius: 12px;
+    backdrop-filter: blur(var(--glass-blur));
+    align-items: center;
+    min-width: 340px;
+    box-shadow: 0 6px 24px rgba(2,6,23,0.6);
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .info-item {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    color: #0b1220;
+  }
+
+ .info-icon {
+  width: 55px;
+  height: 55px;
+
+  border-radius: 12px;
+
+  place-items: center;
+  font-size: 1.3rem;
+}
+
+.info-label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+  .info-value { font-weight: 700; font-size: 0.92rem; color: #ffffff; }
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0 3rem 0;
+}
+
+.stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--glass);
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.stat-card:hover {
+  transform: translateY(-6px);
+  background: linear-gradient(180deg, #23263f, #1d2035);
+}
+
+.stat-icon {
+  font-size: 2.4rem;
+  margin-bottom: 1rem;
+  color: #93c5fd;
+}
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+}
+.stat-label {
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+}
+.stat-change {
+  color: var(--success);
+  font-size: 0.95rem;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.search-box {
+  flex: 1;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--glass);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.search-box input {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 1rem;
+  flex: 1;
+  outline: none;
+}
+
+.controls select, .controls .btn {
+  background: var(--surface);
+  border: 1px solid var(--glass);
+  border-radius: var(--radius);
+  padding: 0.75rem 1.1rem;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.controls select:hover, .controls .btn:hover {
+  background: var(--card);
+}
+
+.modal-trigger {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.3rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+.modal-trigger:hover {
+  transform: translateY(-4px);
+}
+
+/* Exam Cards */
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 2rem;
+}
+
+.exam-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  border: 1px solid var(--glass);
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+}
+.exam-card:hover {
+  transform: translateY(-6px);
+  background: linear-gradient(180deg, #1e2237, #161a2e);
+}
+
+.exam-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+.exam-desc {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+.exam-meta {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.2rem;
+}
+.meta-item {
+  background: var(--surface);
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+}
+.exam-actions {
+  display: flex;
+  gap: 0.8rem;
+}
+.btn-start-exam {
+  flex: 1;
+  background: linear-gradient(90deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.8rem 1.1rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn-preview {
+  border: 1px solid var(--glass);
+  background: transparent;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+}
+
+/* Modal */
+.custom-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+.modal-content {
+  background: var(--card);
+  padding: 2rem;
+  border-radius: var(--radius);
+  max-width: 900px;
+  width: 100%;
+  box-shadow: var(--shadow);
+}
+.close-modal {
+  float: right;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welcome-section h1 {
+    font-size: 2rem;
+  }
+  .info-card {
+    padding: 1.2rem;
+  }
+  .exam-card {
+    padding: 1.2rem;
+  }
+}
+
+#examPreviewModal .modal-content {
+  background: linear-gradient(180deg, #1b1f33, #14182b);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  animation: fadeInModal 0.3s ease forwards;
+  position: relative;
+}
+
+#examPreviewModal .close-modal {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  font-size: 1.6rem;
+  color: #9ca3af;
+  transition: color 0.2s ease;
+}
+#examPreviewModal .close-modal:hover {
+  color: #f87171;
+}

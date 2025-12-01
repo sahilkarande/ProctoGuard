@@ -1,0 +1,101 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.staging
+
+# Database files
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.conda/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Flask sessions
+flask_session/
+
+# OpenVINO models (if downloaded)
+models/
+
+# Uploaded files (if any)
+uploads/
+N
+# Files directory (sample data and uploads)
+Files/
+
+# Node modules (if any frontend JS)
+node_modules/
+
+# Distribution
+dist/
+build/
+
+# Coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# AI/ML models and data
+*.h5
+*.pkl
+*.joblib
+*.model
+
+# Email attachments or temp files
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+
+# Windows executables
+*.exe
+*.dll
+
+# Mac
+*.dmg
+*.app
+
+# Linux
+*.deb
+*.rpm

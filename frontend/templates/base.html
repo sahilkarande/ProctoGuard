@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ExamPro - Secure Proctored Exam Platform with AI-powered monitoring">
+    <meta name="keywords" content="exam, proctoring, education, online exam, AI proctoring">
+    <meta name="author" content="ExamPro Team">
+    
+    <!-- Title -->
+    <title>{% block title %}ExamPro - Secure Proctored Exam Platform{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+        <!-- FAVICON: Using applogo.png as the tab icon -->
+    <link rel="icon" href="static/images/applogo.png" type="image/png">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- Extra CSS Block -->
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- ============================= -->
+    <!-- NAVIGATION BAR               -->
+    <!-- ============================= -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <!-- Theme-switching Logo -->
+                <img id="themeLogo"
+                     src="{{ url_for('static', filename='images/Dark_Theme_logo.png') }}"
+                     alt="ExamPro Logo"
+                     style="height: 60px; cursor: pointer;"
+                     onclick="window.location.href='{{ url_for('index') }}'">
+            </div>
+            
+            <div class="nav-links">
+                {% if current_user.is_authenticated %}
+                    <!-- Theme Toggle Button -->
+
+
+                    <!-- User Info -->
+                    <span class="user-info">
+                        <i class="bi bi-person-circle"></i>
+                        {{ current_user.full_name or current_user.username }}
+                        <span style="color: var(--primary-color); font-weight: 700;">• {{ current_user.role }}</span>
+                    </span>
+                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle Light/Dark Mode">
+                        <span class="icon-sun">☀️</span>
+                        <span class="icon-moon">🌙</span>
+                    </button>
+                    <a href="javascript:history.back()" class="btn-back">
+                        ⬅
+                    </a>
+                    
+                    <!-- Logout Button -->
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+
+
+                {% else %}
+                    <!-- Theme Toggle Button (Guest) -->
+                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle Light/Dark Mode">
+                        <span class="icon-sun">☀️</span>
+                        <span class="icon-moon">🌙</span>
+                    </button>
+
+                    <!-- Guest Navigation Links -->
+                    <a href="{{ url_for('index') }}" class="btn btn-outline">
+                        <i class="bi bi-house"></i> Home
+                    </a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- ============================= -->
+    <!-- MAIN CONTENT AREA            -->
+    <!-- ============================= -->
+    <main class="main-content">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}" role="alert">
+                            <div class="alert-content">
+                                {% if category == 'success' %}
+                                    <i class="bi bi-check-circle-fill"></i>
+                                {% elif category == 'error' %}
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-info-circle-fill"></i>
+                                {% endif %}
+                                <span>{{ message }}</span>
+                            </div>
+                            <button class="alert-close" onclick="this.parentElement.remove()" aria-label="Close alert">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Page Content Block -->
+        {% block content %}{% endblock %}
+    </main>
+
+
+    <!-- ============================= -->
+    <!-- FOOTER                       -->
+    <!-- ============================= -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>ExamPro</h4>
+                    <p>Secure Proctored Exam Platform</p>
+                </div>
+                <div class="footer-section">
+                    <p>&copy; 2025 ExamPro. Built with Flask & AI.</p>
+                    <p class="footer-links">
+                        <a href="#">Privacy Policy</a> • 
+                        <a href="#">Terms of Service</a> • 
+                        <a href="#">Contact Us</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ============================= -->
+    <!-- GLOBAL LOADER                -->
+    <!-- ============================= -->
+    <div id="globalLoader" class="global-loader" style="display: none;">
+        <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <p class="loader-text">Processing... Please wait</p>
+        </div>
+    </div>
+
+    <!-- ============================= -->
+    <!-- CORE SCRIPTS                 -->
+    <!-- ============================= -->
+    
+    <!-- Theme Toggle Script -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+    <!-- Back Button Functionality -->
+    <script>
+        function goBack() {
+            // Add smooth transition
+            document.body.style.opacity = '0.8';
+            
+            setTimeout(() => {
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.href = "{{ url_for('index') }}";
+                }
+            }, 150);
+        }
+
+        // Show/hide back button based on scroll and history
+        window.addEventListener('DOMContentLoaded', function() {
+            const backBtn = document.getElementById('floatingBackBtn');
+            let lastScrollTop = 0;
+            
+            // Hide on homepage
+            const currentPath = window.location.pathname;
+            if (currentPath === '/' || currentPath === '/index' || currentPath === '{{ url_for("index") }}') {
+                backBtn.style.display = 'none';
+            }
+
+            // Show/hide based on scroll
+            window.addEventListener('scroll', function() {
+                let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                
+                if (scrollTop > 300) {
+                    backBtn.classList.add('visible');
+                } else {
+                    backBtn.classList.remove('visible');
+                }
+                
+                lastScrollTop = scrollTop;
+            });
+
+            // Show immediately if not at top of page
+            if (window.pageYOffset > 300) {
+                backBtn.classList.add('visible');
+            }
+        });
+    </script>
+
+    <!-- Logo Theme Switcher -->
+    <script>
+
+
+        // Update on page load
+        window.addEventListener('DOMContentLoaded', updateLogoBasedOnTheme);
+
+        // Update when user toggles theme
+        document.getElementById("themeToggle")?.addEventListener("click", () => {
+            setTimeout(updateLogoBasedOnTheme, 50);
+        });
+    </script>
+
+    <!-- Global Loader Script -->
+    <script>
+        let loaderTimer = null;
+
+        function showLoader(message = "Processing... Please wait") {
+            const loader = document.getElementById("globalLoader");
+            const text = loader?.querySelector(".loader-text");
+            if (loader) {
+                loader.style.display = "flex";
+                loader.classList.remove("fade-out");
+                if (text) text.textContent = message;
+            }
+        }
+
+        function hideLoader(force = false) {
+            const loader = document.getElementById("globalLoader");
+            if (!loader) return;
+
+            if (!force && loaderTimer) return;
+
+            loader.classList.add("fade-out");
+            setTimeout(() => (loader.style.display = "none"), 300);
+        }
+
+        async function enforceDelay() {
+            loaderTimer = true;
+            await new Promise((r) => setTimeout(r, 1000)); // Reduced from 10000 to 1000ms
+            loaderTimer = null;
+        }
+
+        async function fetchWithLoader(url, options = {}, message = "Processing...") {
+            showLoader(message);
+            await enforceDelay();
+            const response = await fetch(url, options);
+            hideLoader();
+            return response;
+        }
+
+        // Show loader on page unload
+        window.addEventListener("beforeunload", () => showLoader("Loading next page..."));
+
+        // Show loader on form submit (unless form has 'no-loader' class)
+        document.addEventListener("submit", (e) => {
+            const form = e.target;
+            if (form.classList.contains("no-loader")) return;
+            showLoader("Submitting form... Please wait");
+        });
+    </script>
+
+    <!-- Auto-dismiss alerts after 5 seconds -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-20px)';
+                    setTimeout(() => alert.remove(), 300);
+                }, 5000);
+            });
+        });
+    </script>
+
+    <!-- Keyboard Shortcuts -->
+    <script>
+        document.addEventListener('keydown', function(e) {
+            // Alt + Left Arrow = Go Back
+            if (e.altKey && e.key === 'ArrowLeft') {
+                e.preventDefault();
+                goBack();
+            }
+            
+            // Alt + T = Toggle Theme
+            if (e.altKey && e.key === 't') {
+                e.preventDefault();
+                document.getElementById('themeToggle')?.click();
+            }
+            
+            // Escape = Close modals
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.custom-modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+    </script>
+
+    <!-- Extra JavaScript Block -->
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>

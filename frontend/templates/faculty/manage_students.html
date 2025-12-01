@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block title %}Manage Students{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/student_management.css') }}">
+
+{% endblock %}
+
+{% block content %}
+<div class="student-management-container">
+    <!-- Page Header -->
+    <div class="page-hero">
+        <div class="hero-content">
+            <div class="hero-icon">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="hero-text">
+                <h1 class="hero-title">Student Management Section</h1>
+            </div>
+        </div>
+        <div class="hero-actions">
+            <button class="btn-hero btn-hero-secondary" onclick="openImportModal()">
+                <i class="bi bi-cloud-upload"></i>
+                <span>Import Students</span>
+            </button>
+            <button class="btn-hero btn-hero-success" onclick="exportStudents()">
+                <i class="bi bi-download"></i>
+                <span>Export CSV</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Dashboard -->
+    <div class="stats-dashboard">
+        <div class="stat-card stat-card-blue">
+            <div class="stat-icon-wrapper">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ students|length }}</div>
+                <div class="stat-label">Total Students</div>
+            </div>
+            <div class="stat-trend">
+                <span class="trend-up"><i class="bi bi-arrow-up"></i> Active</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-card-purple">
+            <div class="stat-icon-wrapper">
+                <i class="bi bi-calendar-event"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ batches|length }}</div>
+                <div class="stat-label">Active Batches</div>
+            </div>
+            <div class="stat-trend">
+                <span class="trend-neutral">{{ batches|length }} batches</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-card-orange">
+            <div class="stat-icon-wrapper">
+                <i class="bi bi-building"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ departments|length }}</div>
+                <div class="stat-label">Departments</div>
+            </div>
+            <div class="stat-trend">
+                <span class="trend-neutral">Across campus</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-card-green">
+            <div class="stat-icon-wrapper">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ students|selectattr('is_verified')|list|length }}</div>
+                <div class="stat-label">Verified</div>
+            </div>
+            <div class="stat-trend">
+                <span class="trend-up">
+                    <i class="bi bi-arrow-up"></i> 
+                    {{ ((students|selectattr('is_verified')|list|length / students|length * 100) if students|length > 0 else 0)|round(1) }}%
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Panel -->
+    <div class="filter-panel">
+        <div class="filter-header">
+            <h3 class="filter-title">
+                <i class="bi bi-funnel"></i>
+                Search & Filter
+            </h3>
+            <button class="filter-toggle" onclick="toggleAdvancedFilters()">
+                <span id="filterToggleText">Show Advanced</span>
+                <i class="bi bi-chevron-down" id="filterToggleIcon"></i>
+            </button>
+        </div>
+
+        <form method="get" id="filterForm">
+            <div class="quick-search">
+                <div class="search-box">
+                    <i class="bi bi-search"></i>
+                    <input 
+                        type="text" 
+                        name="q" 
+                        placeholder="Search by name, email, PRN, roll ID..."
+                        value="{{ request.args.get('q', '') }}"
+                    >
+                    {% if request.args.get('q') %}
+                    <button type="button" class="search-clear" onclick="clearSearch()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                <button type="submit" class="btn-search">
+                    <i class="bi bi-search"></i>
+                    Search
+                </button>
+            </div>
+
+            <div class="advanced-filters" id="advancedFilters" style="display: none;">
+                <div class="filter-grid">
+                    <div class="filter-item">
+                        <label><i class="bi bi-calendar-check"></i> Batch</label>
+                        <select name="batch">
+                            <option value="">All Batches</option>
+                            {% for batch in batches %}
+                            <option value="{{ batch }}" {% if request.args.get('batch') == batch %}selected{% endif %}>{{ batch }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label><i class="bi bi-building"></i> Department</label>
+                        <select name="department">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label><i class="bi bi-shield-check"></i> Verification</label>
+                        <select name="verified">
+                            <option value="">All Students</option>
+                            <option value="true" {% if request.args.get('verified') == 'true' %}selected{% endif %}>Verified Only</option>
+                            <option value="false" {% if request.args.get('verified') == 'false' %}selected{% endif %}>Unverified Only</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-item">
+                        <label><i class="bi bi-sort-down"></i> Sort By</label>
+                        <select name="sort">
+                            <option value="">Recent First</option>
+                            <option value="name" {% if request.args.get('sort') == 'name' %}selected{% endif %}>Name (A-Z)</option>
+                            <option value="batch" {% if request.args.get('sort') == 'batch' %}selected{% endif %}>Batch</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button type="submit" class="btn-filter btn-filter-apply">
+                        <i class="bi bi-check2"></i> Apply Filters
+                    </button>
+                    <button type="button" class="btn-filter btn-filter-reset" onclick="clearFilters()">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reset All
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Students Table -->
+    {% if students %}
+    <div class="table-container">
+        <div class="table-toolbar">
+            <div class="toolbar-left">
+                <div class="selection-info">
+                    <input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
+                    <span class="selection-count" id="selectionCount">0 selected</span>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <button class="btn-toolbar" onclick="exportSelected()">
+                    <i class="bi bi-download"></i> Export Selected
+                </button>
+                <button class="btn-toolbar btn-toolbar-danger" onclick="deleteSelected()">
+                    <i class="bi bi-trash"></i> Delete Selected
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="students-table">
+                <thead>
+                    <tr>
+                        <th class="th-checkbox">
+                            <input type="checkbox" class="header-checkbox" onclick="toggleSelectAll()">
+                        </th>
+                        <th>Student</th>
+                        <th>PRN</th>
+                        <th>Roll</th>
+                        <th>Batch</th>
+                        <th>Department</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr class="table-row">
+                        <td>
+                            <input type="checkbox" class="student-checkbox" value="{{ student.id }}">
+                        </td>
+                        <td>
+                            <div class="student-cell">
+                                <div class="student-avatar" style="background: linear-gradient(135deg, {{ ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']|random }}, {{ ['#4f46e5', '#7c3aed', '#db2777', '#d97706', '#059669']|random }});">
+                                    {{ (student.full_name or student.username)[0]|upper }}
+                                </div>
+                                <div class="student-info-cell">
+                                    <div class="student-name-cell">{{ student.full_name or student.username }}</div>
+                                    <div class="student-meta">@{{ student.username }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="prn-badge">{{ student.prn_number or '—' }}</span></td>
+                        <td><span class="roll-badge">{{ student.roll_id or '—' }}</span></td>
+                        <td>
+                            {% if student.batch %}
+                            <span class="batch-tag">{{ student.batch }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="dept-text">{{ student.department or '—' }}</span></td>
+                        <td>
+                            <div class="contact-cell">
+                                {% if student.email %}
+                                <a href="mailto:{{ student.email }}" class="contact-link" title="{{ student.email }}">
+                                    <i class="bi bi-envelope"></i>
+                                </a>
+                                {% endif %}
+                                {% if student.phone %}
+                                <a href="tel:{{ student.phone }}" class="contact-link" title="{{ student.phone }}">
+                                    <i class="bi bi-telephone"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if student.is_verified %}
+                            <span class="status-badge status-verified">
+                                <i class="bi bi-patch-check-fill"></i> Verified
+                            </span>
+                            {% else %}
+                            <span class="status-badge status-pending">
+                                <i class="bi bi-clock"></i> Pending
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-group">
+                                <a href="{{ url_for('student_profile', student_id=student.id) }}" class="action-btn action-btn-view" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('faculty_edit_student', student_id=student.id) }}" class="action-btn action-btn-edit" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button class="action-btn action-btn-delete" onclick="deleteStudent({{ student.id }})" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-footer">
+            <div class="footer-info">
+                Showing <strong>{{ students|length }}</strong> student{{ 's' if students|length != 1 else '' }}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+        <h3 class="empty-title">No Students Found</h3>
+        <p class="empty-message">
+            {% if request.args.get('q') %}
+                No results for "{{ request.args.get('q') }}". Try different search terms.
+            {% else %}
+                Start by importing student records.
+            {% endif %}
+        </p>
+        <div class="empty-actions">
+            {% if request.args.get('q') %}
+            <a href="{{ url_for('faculty_student_list') }}" class="btn-empty btn-empty-primary">
+                <i class="bi bi-arrow-left"></i> Show All Students
+            </a>
+            {% else %}
+            <button class="btn-empty btn-empty-primary" onclick="openImportModal()">
+                <i class="bi bi-upload"></i> Import Students
+            </button>
+            <a href="{{ url_for('download_student_template') }}" class="btn-empty btn-empty-secondary">
+                <i class="bi bi-download"></i> Download Template
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Import Modal -->
+<div class="modal-backdrop" id="importModal">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content-wrapper">
+            <div class="modal-header-custom">
+                <div class="modal-title-wrapper">
+                    <div class="modal-icon">
+                        <i class="bi bi-cloud-upload"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title-custom">Import Students</h3>
+                        <p class="modal-subtitle">Upload CSV or Excel file</p>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeImportModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <form id="importForm" action="{{ url_for('faculty_import_students') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body-custom">
+                    <div class="quick-actions-bar">
+                        <a href="{{ url_for('download_student_template') }}" class="btn-quick-action">
+                            <i class="bi bi-download"></i> Download Template
+                        </a>
+
+                    </div>
+
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('csvFile').click()">
+                        <div class="upload-zone-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                        <h4 class="upload-zone-title">Drop your file here</h4> <br>
+                        <br>
+                        <p class="upload-zone-text">or click to browse</p>
+                        <p class="upload-zone-hint">CSV, XLSX, XLS, JSON • Max 5MB</p>
+                        <input type="file" id="csvFile" name="file" accept=".csv,.xlsx,.xls,.json" style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+
+                    <div id="filePreview" class="file-preview">
+                        <div class="file-preview-icon"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                        <div class="file-preview-info">
+                            <div class="file-preview-name" id="fileName"></div>
+                            <div class="file-preview-size" id="fileSize"></div>
+                        </div>
+                        <button type="button" class="file-remove-btn" onclick="clearFile()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+
+                    <div class="sample-preview">
+                        <div class="sample-preview-header">
+                            <i class="bi bi-table"></i> <strong>Sample Format</strong>
+                        </div>
+                        <div class="sample-table-wrapper">
+                            <table class="sample-table">
+                                <thead>
+                                    <tr>
+                                        <th>email</th>
+                                        <th>full_name</th>
+                                        <th>prn_number</th>
+                                        <th>batch</th>
+                                        <th>department</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>john@university.edu</td>
+                                        <td>John Doe</td>
+                                        <td>250840325012</td>
+                                        <td>2024</td>
+                                        <td>Computer Science</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-modal btn-modal-cancel" onclick="closeImportModal()">Cancel</button>
+                    <button type="submit" class="btn-modal btn-modal-primary" id="uploadBtn" disabled>
+                        <i class="bi bi-upload"></i> Upload & Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/student_management.js') }}"></script>
+{% endblock %}

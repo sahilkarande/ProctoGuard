@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Exam Results{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="max-width: 900px; margin: 0 auto;">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Exam Results</h1>
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline">← Back to Dashboard</a>
+        </div>
+
+        <!-- Results Summary -->
+        <div class="card mb-4" style="text-align: center; padding: 2rem;">
+            {% if student_exam.passed %}
+            <div style="font-size: 4rem; color: var(--secondary-color);">🎉</div>
+            <h1 style="color: var(--secondary-color); margin: 1rem 0;">Congratulations!</h1>
+            <h2>You Passed!</h2>
+            {% else %}
+            <div style="font-size: 4rem; color: var(--danger-color);">📊</div>
+            <h2 style="color: var(--danger-color); margin: 1rem 0;">Keep Trying!</h2>
+            {% endif %}
+
+            <div class="stats-grid" style="margin-top: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-value">{{ student_exam.score }}</div>
+                    <div class="stat-label">Score Obtained</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-value">{{ student_exam.total_points }}</div>
+                    <div class="stat-label">Total Points</div>
+                </div>
+                
+                <div class="stat-card">
+                    {% set color = 'var(--secondary-color)' if student_exam.passed else 'var(--danger-color)' %}
+                    <div class="stat-value" style="color: {{ color }};">
+                        {{ "%.2f"|format(student_exam.percentage) }}%
+                    </div>
+                    <div class="stat-label">Percentage</div>
+                </div>
+
+                
+                <div class="stat-card">
+                    <div class="stat-value">{{ student_exam.time_taken_minutes }}</div>
+                    <div class="stat-label">Time Taken (min)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exam Details -->
+        <div class="card mb-4">
+            <h2>Exam: {{ exam.title }}</h2>
+            <div class="grid grid-2 mt-2">
+                <div>
+                    <p><strong>Passing Score:</strong> {{ exam.passing_score }}%</p>
+                    <p><strong>Duration:</strong> {{ exam.duration_minutes }} minutes</p>
+                </div>
+                <div>
+                    <p><strong>Your Status:</strong> 
+                        {% if student_exam.passed %}
+                        <span class="badge badge-success">Passed</span>
+                        {% else %}
+                        <span class="badge badge-danger">Failed</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Submitted:</strong> 
+                        {% if student_exam.submitted_at %}
+                            {{ student_exam.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            Not Available
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Review -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Answer Review</h2>
+            </div>
+
+            {% for item in answers_with_questions %}
+            <div class="question-card">
+                <div class="question-number">Question {{ loop.index }}</div>
+                <div class="question-text">{{ item.question.question_text }}</div>
+                
+                <div class="options">
+                    <div class="option {% if item.question.correct_answer == 'A' %}correct{% elif item.answer.selected_answer == 'A' %}incorrect{% endif %}">
+                        <span>A) {{ item.question.option_a }}</span>
+                        {% if item.question.correct_answer == 'A' %}
+                        <span style="margin-left: auto; color: var(--secondary-color); font-weight: 600;">✓ Correct Answer</span>
+                        {% elif item.answer.selected_answer == 'A' %}
+                        <span style="margin-left: auto; color: var(--danger-color); font-weight: 600;">✗ Your Answer</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="option {% if item.question.correct_answer == 'B' %}correct{% elif item.answer.selected_answer == 'B' %}incorrect{% endif %}">
+                        <span>B) {{ item.question.option_b }}</span>
+                        {% if item.question.correct_answer == 'B' %}
+                        <span style="margin-left: auto; color: var(--secondary-color); font-weight: 600;">✓ Correct Answer</span>
+                        {% elif item.answer.selected_answer == 'B' %}
+                        <span style="margin-left: auto; color: var(--danger-color); font-weight: 600;">✗ Your Answer</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if item.question.option_c %}
+                    <div class="option {% if item.question.correct_answer == 'C' %}correct{% elif item.answer.selected_answer == 'C' %}incorrect{% endif %}">
+                        <span>C) {{ item.question.option_c }}</span>
+                        {% if item.question.correct_answer == 'C' %}
+                        <span style="margin-left: auto; color: var(--secondary-color); font-weight: 600;">✓ Correct Answer</span>
+                        {% elif item.answer.selected_answer == 'C' %}
+                        <span style="margin-left: auto; color: var(--danger-color); font-weight: 600;">✗ Your Answer</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if item.question.option_d %}
+                    <div class="option {% if item.question.correct_answer == 'D' %}correct{% elif item.answer.selected_answer == 'D' %}incorrect{% endif %}">
+                        <span>D) {{ item.question.option_d }}</span>
+                        {% if item.question.correct_answer == 'D' %}
+                        <span style="margin-left: auto; color: var(--secondary-color); font-weight: 600;">✓ Correct Answer</span>
+                        {% elif item.answer.selected_answer == 'D' %}
+                        <span style="margin-left: auto; color: var(--danger-color); font-weight: 600;">✗ Your Answer</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <strong>Result:</strong> 
+                    {% if item.answer.is_correct %}
+                    <span class="badge badge-success">Correct (+{{ item.answer.points_earned }} points)</span>
+                    {% else %}
+                    <span class="badge badge-danger">Incorrect (0 points)</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

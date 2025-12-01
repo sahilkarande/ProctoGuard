@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}Student Profile - {{ student.full_name }}{% endblock %}
+
+{% block content %}
+<style>
+</style>
+<div class="container">
+    <!-- Back Button -->
+    <div style="margin-bottom: 1.5rem;">
+
+    </div>
+
+    <!-- Student Profile Header -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <a href="#" class="student-info">
+                    <h2 class="student-name">
+                        <i class="bi bi-person-circle"></i> {{ student.full_name or student.username }}
+                    </h2>
+                    <p class="student-prn">
+                        <i class="bi bi-hash"></i> {{ student.prn_number or 'N/A' }}
+                    </p>
+                </a>
+
+
+            </div>
+            
+            <!-- Password Reset Button -->
+            <button class="btn btn-danger" onclick="openPasswordModal()" style="display: flex; align-items: center; gap: 8px;">
+                <i class="bi bi-key-fill"></i>
+                Reset Password
+            </button>
+        </div>
+    </div>
+
+    <!-- Student Information Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-info-circle"></i> Student Information
+            </h3>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-person-badge"></i> Full Name
+                    </div>
+                    <div class="info-value">{{ student.full_name or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-at"></i> Username
+                    </div>
+                    <div class="info-value">{{ student.username }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-envelope"></i> Email
+                    </div>
+                    <div class="info-value">{{ student.email }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-card-text"></i> PRN Number
+                    </div>
+                    <div class="info-value">{{ student.prn_number or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-calendar-event"></i> Batch
+                    </div>
+                    <div class="info-value">{{ student.batch or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-building"></i> Department
+                    </div>
+                    <div class="info-value">{{ student.department or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-phone"></i> Phone
+                    </div>
+                    <div class="info-value">{{ student.phone or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-gender-ambiguous"></i> Gender
+                    </div>
+                    <div class="info-value">{{ student.gender or 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-shield-check"></i> Verification Status
+                    </div>
+                    <div class="info-value">
+                        {% if student.is_verified %}
+                            <span class="badge badge-success">
+                                <i class="bi bi-check-circle-fill"></i> Verified
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                <i class="bi bi-clock-fill"></i> Pending
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-key"></i> Password Status
+                    </div>
+                    <div class="info-value">
+                        {% if student.password_changed %}
+                            <span class="badge badge-success">
+                                <i class="bi bi-check-circle-fill"></i> Changed
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                <i class="bi bi-exclamation-triangle-fill"></i> Must Change
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-calendar-plus"></i> Registered
+                    </div>
+                    <div class="info-value">{{ student.created_at.strftime('%d %b, %Y') if student.created_at else 'N/A' }}</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam Performance -->
+    {% if student_exams %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-graph-up"></i> Exam Performance
+            </h3>
+            <span class="badge" style="background: var(--primary-color);">
+                {{ student_exams|length }} Exams Taken
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Exam Title</th>
+                            <th>Score</th>
+                            <th>Percentage</th>
+                            <th>Status</th>
+                            <th>Time Taken</th>
+                            <th>Violations</th>
+                            <th>Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for se in student_exams %}
+                        <tr>
+                            <td>
+                                <strong>{{ se.exam.title }}</strong>
+                            </td>
+                            <td>
+                                <strong>{{ se.score or 0 }}/{{ se.total_points or 0 }}</strong>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div class="progress-container" style="width: 100px;">
+                                        <div class="progress-bar {{ 'success' if se.passed else 'danger' }}" 
+                                             style="width: {{ se.percentage or 0 }}%;"></div>
+                                    </div>
+                                    <strong>{{ "%.1f"|format(se.percentage or 0) }}%</strong>
+                                </div>
+                            </td>
+                            <td>
+                                {% if se.passed %}
+                                    <span class="badge badge-success">
+                                        <i class="bi bi-check-circle-fill"></i> Passed
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-danger">
+                                        <i class="bi bi-x-circle-fill"></i> Failed
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ se.time_taken_minutes or 'N/A' }} min</td>
+                            <td>
+                                {% if se.total_violations %}
+                                    {% if se.total_violations >= 6 %}
+                                        <span class="badge badge-danger">
+                                            <i class="bi bi-exclamation-circle-fill"></i> {{ se.total_violations }}
+                                        </span>
+                                    {% elif se.total_violations >= 3 %}
+                                        <span class="badge badge-warning">
+                                            <i class="bi bi-exclamation-triangle"></i> {{ se.total_violations }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge badge-info">
+                                            <i class="bi bi-info-circle"></i> {{ se.total_violations }}
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge badge-success">
+                                        <i class="bi bi-check-circle"></i> 0
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>{{ se.submitted_at.strftime('%d %b, %H:%M') if se.submitted_at else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center" style="padding: 3rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;">📝</div>
+            <h3 style="margin-bottom: 0.5rem;">No Exams Taken Yet</h3>
+            <p style="color: var(--text-secondary);">This student hasn't taken any exams yet.</p>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Password Reset Modal -->
+<div id="passwordModal" class="password-modal">
+    <div class="password-modal-content">
+        <div class="password-modal-header">
+            <h3>
+                <i class="bi bi-key-fill" style="color: #ef4444;"></i>
+                Reset Student Password
+            </h3>
+            <button class="password-modal-close" onclick="closePasswordModal()">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+
+        <div class="password-warning">
+            <p>
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>Warning:</strong> This will reset the password for <strong>{{ student.full_name or student.username }}</strong>. 
+                The student will be required to change it on their next login.
+            </p>
+        </div>
+
+        <form id="passwordResetForm">
+            <div class="form-group-modal">
+                <label for="new_password">
+                    <i class="bi bi-shield-lock-fill"></i>
+                    New Password
+                </label>
+                <input type="password" 
+                       id="new_password" 
+                       name="new_password" 
+                       required
+                       minlength="6"
+                       placeholder="Enter new password (min 6 characters)">
+            </div>
+
+            <div class="form-group-modal">
+                <label for="confirm_password">
+                    <i class="bi bi-check-circle-fill"></i>
+                    Confirm Password
+                </label>
+                <input type="password" 
+                       id="confirm_password" 
+                       name="confirm_password" 
+                       required
+                       minlength="6"
+                       placeholder="Confirm new password"
+                       oninput="validatePasswordMatch()">
+            </div>
+
+            <div id="passwordMatchStatus" style="margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
+
+            <button type="submit" class="btn-reset-password" id="submitBtn">
+                <i class="bi bi-shield-check"></i>
+                Reset Password
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Open password modal
+    function openPasswordModal() {
+        document.getElementById('passwordModal').classList.add('active');
+        document.getElementById('new_password').focus();
+    }
+
+    // Close password modal
+    function closePasswordModal() {
+        document.getElementById('passwordModal').classList.remove('active');
+        document.getElementById('passwordResetForm').reset();
+        document.getElementById('passwordMatchStatus').style.display = 'none';
+    }
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+        const modal = document.getElementById('passwordModal');
+        if (e.target === modal) {
+            closePasswordModal();
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePasswordModal();
+        }
+    });
+
+    // Validate password match in real-time
+    function validatePasswordMatch() {
+        const newPassword = document.getElementById('new_password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        const statusDiv = document.getElementById('passwordMatchStatus');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (confirmPassword.length === 0) {
+            statusDiv.style.display = 'none';
+            submitBtn.disabled = false;
+            return;
+        }
+        
+        statusDiv.style.display = 'block';
+        
+        if (newPassword === confirmPassword) {
+            statusDiv.innerHTML = '<span style="color: #10b981;"><i class="bi bi-check-circle-fill"></i> Passwords match</span>';
+            statusDiv.style.color = '#10b981';
+            submitBtn.disabled = false;
+        } else {
+            statusDiv.innerHTML = '<span style="color: #ef4444;"><i class="bi bi-x-circle-fill"></i> Passwords do not match</span>';
+            statusDiv.style.color = '#ef4444';
+            submitBtn.disabled = true;
+        }
+    }
+
+    // Handle form submission
+    document.getElementById('passwordResetForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const newPassword = document.getElementById('new_password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // Validation
+        if (!newPassword || !confirmPassword) {
+            alert('❌ Both password fields are required!');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            alert('❌ Passwords do not match!');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            alert('❌ Password must be at least 6 characters long!');
+            return;
+        }
+        
+        // Confirm action
+        if (!confirm('Are you sure you want to reset this student\'s password?')) {
+            return;
+        }
+        
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetting Password...';
+        
+        try {
+            const formData = new FormData();
+            formData.append('new_password', newPassword);
+            formData.append('confirm_password', confirmPassword);
+            
+            const response = await fetch('{{ url_for("faculty_change_student_password", student_id=student.id) }}', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ ' + data.message);
+                closePasswordModal();
+                
+                // Update password status badge on page
+                location.reload();
+            } else {
+                alert('❌ ' + data.message);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ An error occurred: ' + error.message);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+        }
+    });
+
+    // Add enter key support
+    document.getElementById('new_password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('confirm_password').focus();
+        }
+    });
+
+    document.getElementById('confirm_password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('passwordResetForm').dispatchEvent(new Event('submit'));
+        }
+    });
+</script>
+{% endblock %}
