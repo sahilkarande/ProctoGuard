@@ -718,7 +718,8 @@ function submitExam(autoSubmit = false) {
     if (autoSubmit || confirm(message)) {
         const submitForm = document.getElementById('submit-form');
         if (submitForm) submitForm.submit();
-        else window.location.href = `/exam/${ExamState.studentExamId}/submit`;
+        else window.location.href = `/submit_exam/${ExamState.studentExamId}`;
+
     } else {
         ExamState.isExamActive = true;
         startTimer();

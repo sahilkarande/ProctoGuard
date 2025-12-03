@@ -59,6 +59,8 @@ from backend.services.proctor_vision.openvino_vision import (
     OpenVINOProctor
 )
 
+from models import StudentAnswer
+
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1949,41 +1951,42 @@ def register_routes(app):
             existing_answers=existing_answers
         )
 
-    @app.route('/api/save-answer/<int:student_exam_id>', methods=['POST'])
+    @app.route('/api/save-answer', methods=['POST'])
     @login_required
-    def api_save_answer(student_exam_id):
-        """Save or update a student's answer (AJAX endpoint)."""
-        data = request.get_json() or {}
-        question_id = data.get('question_id')
-        selected_answer = str(data.get('selected_answer', '0')).strip()
+    def save_answer():
 
-        # Validate ownership
-        student_exam = StudentExam.query.get_or_404(student_exam_id)
-        if student_exam.student_id != current_user.id:
-            return jsonify({"error": "Unauthorized"}), 403
+        data = request.get_json()
+        student_exam_id = data.get("student_exam_id")
+        answers = data.get("answers", {})
 
-        # Check if exam already submitted
-        if student_exam.status == 'submitted':
-            return jsonify({"error": "Exam already submitted"}), 400
+        if not student_exam_id:
+            return jsonify({"error": "missing student_exam_id"}), 400
 
-        # Find or create answer
-        answer = StudentAnswer.query.filter_by(
-            student_exam_id=student_exam.id,
-            question_id=question_id
-        ).first()
+        for qid, selected in answers.items():
+            qid = int(qid)
 
-        if not answer:
-            answer = StudentAnswer(
-                student_exam_id=student_exam.id,
-                question_id=question_id,
-                selected_answer=selected_answer
-            )
-            db.session.add(answer)
-        else:
-            answer.selected_answer = selected_answer
+            record = StudentAnswer.query.filter_by(
+                student_exam_id=student_exam_id,
+                question_id=qid
+            ).first()
+
+            if record is None:
+                # Create new answer row
+                record = StudentAnswer(
+                    student_exam_id=student_exam_id,
+                    question_id=qid,
+                    selected_answer=selected,
+                    answered_at=datetime.utcnow()
+                )
+                db.session.add(record)
+            else:
+                # Update existing row
+                record.selected_answer = selected
+                record.answered_at = datetime.utcnow()
 
         db.session.commit()
-        return jsonify({"status": "success", "saved_answer": selected_answer})
+        return jsonify({"status": "saved"})
+
 
     @app.route('/api/update-tabcount/<int:student_exam_id>', methods=['POST'])
     @login_required
@@ -2087,39 +2090,7 @@ def register_routes(app):
             print(f"❌ Error checking exam status: {e}")
             return jsonify({"error": str(e)}), 500
 
-    @app.route('/api/save-answer', methods=['POST'])
-    @login_required
-    def save_answer():
-        """Save answer"""
-        data = request.json
-        student_exam_id = data.get('student_exam_id')
-        question_id = data.get('question_id')
-        selected_answer = data.get('selected_answer')
-        
-        student_exam = StudentExam.query.get(student_exam_id)
-        
-        if not student_exam or student_exam.student_id != current_user.id:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-        answer = Answer.query.filter_by(
-            student_exam_id=student_exam_id,
-            question_id=question_id
-        ).first()
-        
-        if answer:
-            answer.selected_answer = selected_answer
-            answer.answered_at = datetime.utcnow()
-        else:
-            answer = Answer(
-                student_exam_id=student_exam_id,
-                question_id=question_id,
-                selected_answer=selected_answer
-            )
-            db.session.add(answer)
-        
-        db.session.commit()
-        
-        return jsonify({'success': True})
+
 
     @app.route('/api/log-activity', methods=['POST'])
     @login_required
