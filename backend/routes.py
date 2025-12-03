@@ -1100,45 +1100,79 @@ def register_routes(app):
     @app.route('/faculty/exam/<int:exam_id>')
     @login_required
     def view_exam(exam_id):
-        """View exam details with enhanced access control"""
+        """View exam details with enhanced access control and student-exam mapping."""
+        
+        # Security: Only faculty can view
         if current_user.role != 'faculty':
             flash('Access denied', 'error')
             return redirect(url_for('student_dashboard'))
-        
+
         exam = Exam.query.get_or_404(exam_id)
-        
+
         if exam.creator_id != current_user.id:
             flash('Access denied', 'error')
             return redirect(url_for('faculty_dashboard'))
-        
+
+        # -------------------------------------------------
+        # Basic exam info
+        # -------------------------------------------------
         questions = Question.query.filter_by(exam_id=exam_id).order_by(Question.order_number).all()
         question_count = len(questions)
-        total_attempts = len(exam.student_exams)
-        completed = len([se for se in exam.student_exams if se.status == 'submitted'])
-        
-        # Get all students for access control
-        all_students = User.query.filter_by(role='student').order_by(User.full_name).all()
-        
-        # Get all unique batches
-        batches = db.session.query(User.batch).filter(
-            User.role == 'student',
-            User.batch.isnot(None),
-            User.batch != ''
-        ).distinct().order_by(User.batch).all()
-        all_batches = [b[0] for b in batches]
+
         student_exams = StudentExam.query.filter_by(exam_id=exam_id).all()
-        
+        total_attempts = len(student_exams)
+        completed_attempts = len([se for se in student_exams if se.status == 'submitted'])
+
+        # -------------------------------------------------
+        # Load all students (for access modal)
+        # -------------------------------------------------
+        all_students = User.query.filter_by(role='student').order_by(User.full_name).all()
+
+        # Fetch distinct batches
+        batches = (
+            db.session.query(User.batch)
+            .filter(User.role == 'student', User.batch.isnot(None), User.batch != '')
+            .distinct()
+            .order_by(User.batch)
+            .all()
+        )
+        all_batches = [b[0] for b in batches]
+
+        # -------------------------------------------------
+        # Build student → exams mapping
+        # Show: "This student is selected in X exams"
+        # -------------------------------------------------
+        student_exam_map = {}  # { student_id: [exam_title, ...] }
+
+        faculty_exams = Exam.query.filter_by(creator_id=current_user.id).all()
+
+        for ex in faculty_exams:
+            if not ex.allowed_students:
+                continue
+            
+            allowed_ids = [
+                int(x) for x in ex.allowed_students.split(',') if x.strip().isdigit()
+            ]
+
+            for sid in allowed_ids:
+                student_exam_map.setdefault(sid, []).append(ex.title)
+
+        # -------------------------------------------------
+        # Render page
+        # -------------------------------------------------
         return render_template(
             'faculty/view_exam.html',
             exam=exam,
             questions=questions,
-            total_attempts=total_attempts,
-            completed_attempts=completed,
             question_count=question_count,
+            student_exams=student_exams,
+            total_attempts=total_attempts,
+            completed_attempts=completed_attempts,
             all_students=all_students,
             all_batches=all_batches,
-            student_exams=student_exams  # ← ADD THIS LINE
+            student_exam_map=student_exam_map   # ← NEW: passed to template
         )
+
 
     @app.route('/faculty/exam/<int:exam_id>/analytics')
     @login_required
@@ -1653,75 +1687,95 @@ def register_routes(app):
     @app.route('/faculty/exam/<int:exam_id>/update_access', methods=['POST'])
     @login_required
     def update_exam_access(exam_id):
-        """Update exam access control settings"""
+        """Update exam access control settings with proper status handling."""
+        
+        # Access Check
         if current_user.role != 'faculty':
             flash('Access denied', 'error')
             return redirect(url_for('student_dashboard'))
-        
+
         exam = Exam.query.get_or_404(exam_id)
-        
+
         if exam.creator_id != current_user.id:
             flash("You don't have permission to modify this exam", 'error')
             return redirect(url_for('faculty_dashboard'))
-        
+
+        # Extract mode
         access_mode = request.form.get('access_mode')
-        
+
+        # ---------------------------------------------------------------------
+        # MODE: STOPPED
+        # ---------------------------------------------------------------------
         if access_mode == 'stopped':
-            # Stop access for all students
+
             exam.is_active = False
             exam.allow_all_students = False
             exam.allowed_students = None
-            
-            # Log activity for all active attempts
+            exam.status = "inactive"        # 🔥 NEW: ensures badge shows INACTIVE
+
+            # Log all active student attempts
             active_attempts = StudentExam.query.filter_by(
                 exam_id=exam_id,
                 status='in_progress'
             ).all()
-            
+
             for attempt in active_attempts:
-                log = ActivityLog(
+                db.session.add(ActivityLog(
                     student_exam_id=attempt.id,
                     activity_type='exam_disabled',
                     description='Exam access was stopped by faculty',
                     severity='high',
                     created_at=datetime.utcnow()
-                )
-                db.session.add(log)
-            
+                ))
+
             db.session.commit()
             flash("⚠️ Exam access has been stopped for all students", 'warning')
-            
+
+        # ---------------------------------------------------------------------
+        # MODE: ALLOW ALL STUDENTS
+        # ---------------------------------------------------------------------
         elif access_mode == 'all':
-            # Allow all students
+
             exam.is_active = True
             exam.allow_all_students = True
             exam.allowed_students = None
+            exam.status = "active"          # 🔥 NEW
+
             db.session.commit()
             flash("✅ Exam is now open to all students", 'success')
-            
+
+        # ---------------------------------------------------------------------
+        # MODE: SPECIFIC STUDENTS ONLY
+        # ---------------------------------------------------------------------
         elif access_mode == 'specific':
-            # Allow specific students only
+
             allowed_students = request.form.get('allowed_students', '')
-            
-            if not allowed_students:
+
+            # must select students
+            if not allowed_students.strip():
                 flash("⚠️ Please select at least one student", 'warning')
                 return redirect(url_for('view_exam', exam_id=exam_id))
-            
+
             exam.is_active = True
             exam.allow_all_students = False
             exam.allowed_students = allowed_students
-            
-            # Count selected students
+            exam.status = "active"          # 🔥 NEW
+
+            # Count how many selected
             student_ids = [s.strip() for s in allowed_students.split(',') if s.strip()]
             count = len(student_ids)
-            
+
             db.session.commit()
             flash(f"✅ Exam access granted to {count} selected student(s)", 'success')
-        
+
+        # ---------------------------------------------------------------------
+        # INVALID MODE
+        # ---------------------------------------------------------------------
         else:
             flash("Invalid access mode", 'error')
-        
+
         return redirect(url_for('view_exam', exam_id=exam_id))
+
 
     def calculate_student_score(student_exam_id):
         """
@@ -3068,68 +3122,39 @@ def register_routes(app):
             return jsonify({"error": str(e)}), 500
 
 
-    @app.route('/faculty/force-end-exam/<int:exam_id>', methods=['POST'])
+    @app.route('/faculty/exam/<int:exam_id>/force_end', methods=['POST'])
     @login_required
     def faculty_force_end_exam(exam_id):
-        if current_user.role not in ['faculty', 'admin']:
-            flash('❌ Unauthorized access.', 'error')
-            return redirect(url_for('index'))
-        
-        try:
-            exam = Exam.query.get_or_404(exam_id)
-            
-            if getattr(exam, 'force_ended', False) or getattr(exam, 'status', 'active') == 'ended':
-                flash('⚠️ This exam has already been ended.', 'warning')
-                return redirect(url_for('faculty_dashboard'))  # ← CHANGED
-            
-            exam.force_ended = True
-            exam.status = 'ended'
-            
-            active_exams = StudentExam.query.filter_by(
-                exam_id=exam_id,
-                submitted_at=None
-            ).all()
-            
-            print(f"🔴 Force-ending exam '{exam.title}' (ID: {exam_id})")
-            print(f"📊 Found {len(active_exams)} active student exam(s)")
-            
-            from datetime import datetime
-            submission_time = datetime.utcnow()
-            
-            for student_exam in active_exams:
-                student_exam.submitted_at = submission_time
-                student_exam.force_ended = True
-                student_exam.status = 'completed'
-                student_exam.completed = True
-                
-                if student_exam.started_at:
-                    time_taken = (submission_time - student_exam.started_at).total_seconds() / 60
-                    student_exam.time_taken_minutes = int(time_taken)
-                
-                try:
-                    calculate_student_score(student_exam.id)
-                    print(f"✅ Scored student exam ID: {student_exam.id}")
-                except Exception as score_error:
-                    print(f"⚠️ Error scoring student exam {student_exam.id}: {score_error}")
-            
-            db.session.commit()
-            
-            print(f"✅ Exam force-ended successfully. {len(active_exams)} student(s) auto-submitted.")
-            
-            flash(
-                f'✅ Exam "{exam.title}" has been ended. '
-                f'{len(active_exams)} student(s) auto-submitted and scored.',
-                'success'
-            )
-            return redirect(url_for('faculty_dashboard'))  # ← CHANGED
-            
-        except Exception as e:
-            db.session.rollback()
-            print(f"❌ Error ending exam: {e}")
-            import traceback
-            traceback.print_exc()
-            flash(f'❌ Error ending exam: {str(e)}', 'error')
-            return redirect(url_for('faculty_dashboard'))
+        if current_user.role != 'faculty':
+            flash("Access denied", "error")
+            return redirect(url_for("student_dashboard"))
+
+        exam = Exam.query.get_or_404(exam_id)
+
+        if exam.creator_id != current_user.id:
+            flash("You cannot modify this exam", "error")
+            return redirect(url_for("faculty_dashboard"))
+
+        # mark exam ended
+        exam.force_ended = True
+        exam.status = "ended"
+        exam.force_ended_at = datetime.utcnow()
+
+        # end all in-progress attempts
+        active_attempts = StudentExam.query.filter_by(exam_id=exam_id, status='in_progress').all()
+
+        for attempt in active_attempts:
+            attempt.status = 'submitted'
+            attempt.submitted_at = datetime.utcnow()
+
+            # auto-score the exam
+            calculate_student_score(attempt.id)
+
+        db.session.commit()
+
+        flash("⛔ Exam has been force-ended for all students.", "warning")
+        return redirect(url_for("view_exam", exam_id=exam_id))
+
 
 
     @app.route('/faculty/extend-exam-time/<int:exam_id>', methods=['POST'])

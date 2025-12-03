@@ -1,6 +1,8 @@
 {% extends "base.html" %} {% block title %}View Exam - {{ exam.title }}{% endblock %} {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/view_exam.css') }}"> {% endblock %} {% block content %} <div class="container">
-         <!-- Header -->
+         <!-- ========================== -->
+         <!-- HEADER -->
+         <!-- ========================== -->
          <div class="exam-header">
                   <h1 class="exam-title">
                            <i class="bi bi-file-earmark-text"></i> {{ exam.title }}
@@ -9,198 +11,206 @@
                            {{ exam.description or "No description provided." }}
                   </p>
                   <div class="header-actions">
-                           <a href="{{ url_for('exam_analytics', exam_id=exam.id) }}" class="btn btn-secondary"> Analytics </a>
+                           <a href="{{ url_for('exam_analytics', exam_id=exam.id) }}" class="btn btn-primary"> Analytics </a>
                   </div>
          </div>
-         <!-- Exam Controls Panel -->
-         <div class="card exam-controls-panel">
-                  <div class="card-header">
-                           <h3 class="card-title">
-                                    <i class="bi bi-sliders"></i> Exam Controls
-                           </h3>
-                  </div>
-                  <div class="card-body">
-                           <div class="control-buttons">
-                                    <!-- Force End Exam Button -->
-                                    <form method="POST" action="{{ url_for('faculty_force_end_exam', exam_id=exam.id) }}" onsubmit="return confirm('⚠️ Are you sure you want to END this exam for ALL students?\n\nThis will:\n✓ Auto-submit all active exams\n✓ Calculate final scores\n✓ Block new attempts\n\nThis action cannot be undone!');">
-                                             <button type="submit" class="btn btn-danger" {% if exam.status == 'ended' or exam.force_ended %}disabled{% endif %}>
-                                                      <i class="bi bi-stop-circle"></i> {% if exam.status == 'ended' or exam.force_ended %} Exam Ended {% else %} Force End Exam {% endif %} </button>
-                                    </form>
-                                    <!-- Extend Time Button --> {% if exam.status != 'ended' and not exam.force_ended %} <button onclick="showExtendTimeModal()" class="btn btn-extend">
-                                             <i class="bi bi-clock-history"></i> Extend Time </button> {% endif %}
-                                    <!-- Refresh Status Button -->
-                                    <button onclick="location.reload()" class="btn btn-refresh">
-                                             <i class="bi bi-arrow-clockwise"></i> Refresh Status </button>
+         <!-- ========================== -->
+         <!-- TOP SECTION (2-COLUMN) -->
+         <!-- ========================== -->
+         <div class="top-grid">
+                  <!-- Exam Controls -->
+                  <div class="card panel-box">
+                           <div class="card-header">
+                                    <h3 class="card-title">
+                                             <i class="bi bi-sliders"></i> Exam Controls
+                                    </h3>
                            </div>
-                           <!-- Exam Status Display -->
-                           <div class="status-display {% if exam.status == 'ended' or exam.force_ended %}status-ended{% else %}status-active{% endif %}">
-                                    <i class="bi bi-{% if exam.status == 'ended' or exam.force_ended %}x-circle-fill{% else %}check-circle-fill{% endif %}"></i>
-                                    <span> Status: {% if exam.force_ended %} Force Ended by Faculty {% elif exam.status == 'ended' %} Ended {% else %} Active {% endif %} </span>
-                           </div>
-                  </div>
-         </div>
-         <!-- Live Student Status -->
-         <div class="card live-status-panel">
-                  <div class="card-header">
-                           <h3 class="card-title">
-                                    <i class="bi bi-graph-up"></i> Live Student Status
-                           </h3>
-                  </div> {% set active_count = student_exams|selectattr('submitted_at', 'none')|list|length if student_exams else 0 %} {% set completed_count = student_exams|rejectattr('submitted_at', 'none')|list|length if student_exams else 0 %} <div class="card-body">
-                           <div class="stats-grid">
-                                    <div class="stat-card stat-active">
-                                             <div class="stat-value">{{ active_count }}</div>
-                                             <div class="stat-label">
-                                                      <i class="bi bi-pencil-square"></i> Taking Exam
-                                             </div>
+                           <div class="card-body">
+                                    <div class="control-buttons">
+                                             <form method="POST" action="{{ url_for('faculty_force_end_exam', exam_id=exam.id) }}" onsubmit="return confirm('⚠ Are you sure you want to END this exam for ALL students?');">
+                                                      <button type="submit" class="btn btn-danger" {% if exam.status == 'ended' or exam.force_ended %}disabled{% endif %}>
+                                                               <i class="bi bi-stop-circle"></i> {% if exam.status == 'ended' or exam.force_ended %} Exam Ended {% else %} Force End Exam {% endif %} </button>
+                                             </form> {% if exam.status != 'ended' and not exam.force_ended %} <button onclick="showExtendTimeModal()" class="btn btn-extend">
+                                                      <i class="bi bi-clock-history"></i> Extend Time </button> {% endif %} <button onclick="location.reload()" class="btn btn-refresh">
+                                                      <i class="bi bi-arrow-clockwise"></i> Refresh </button>
                                     </div>
-                                    <div class="stat-card stat-completed">
-                                             <div class="stat-value">{{ completed_count }}</div>
-                                             <div class="stat-label">
-                                                      <i class="bi bi-check-circle"></i> Completed
-                                             </div>
-                                    </div>
-                                    <div class="stat-card stat-duration">
-                                             <div class="stat-value">{{ exam.duration or exam.duration_minutes or 60 }}</div>
-                                             <div class="stat-label">
-                                                      <i class="bi bi-clock"></i> Minutes Duration
-                                             </div>
+                                    <div class="status-display {{ 'status-ended' if exam.status == 'ended' or exam.force_ended else 'status-active' }}">
+                                             <i class="bi bi-{% if exam.status == 'ended' or exam.force_ended %}x-circle-fill{% else %}check-circle-fill{% endif %}"></i>
+                                             <span> {% if exam.force_ended %} Force Ended by Faculty {% elif exam.status == 'ended' %} Ended {% else %} Active {% endif %} </span>
                                     </div>
                            </div>
                   </div>
-         </div>
-         <!-- Exam Details Drawer -->
-         <details class="drawer">
-                  <summary class="drawer-toggle">
-                           <i class="bi bi-info-circle"></i> Exam Details
-                  </summary>
-                  <div class="drawer-content">
-                           <div class="card">
-                                    <div class="card-header">
-                                             <h3 class="card-title">Overview</h3>
+                  <!-- Live Student Status -->
+                  <div class="card panel-box">
+                           <div class="card-header">
+                                    <h3 class="card-title">
+                                             <i class="bi bi-graph-up"></i> Live Student Status
+                                    </h3>
+                           </div> {% set active_count = student_exams|selectattr('submitted_at','none')|list|length %} {% set completed_count = student_exams|rejectattr('submitted_at','none')|list|length %} <div class="card-body">
+                                    <div class="stats-grid">
+                                             <div class="stat-card stat-active">
+                                                      <div class="stat-value">{{ active_count }}</div>
+                                                      <div class="stat-label">
+                                                               <i class="bi bi-pencil-square"></i> Taking
+                                                      </div>
+                                             </div>
+                                             <div class="stat-card stat-completed">
+                                                      <div class="stat-value">{{ completed_count }}</div>
+                                                      <div class="stat-label">
+                                                               <i class="bi bi-check-circle"></i> Completed
+                                                      </div>
+                                             </div>
+                                             <div class="stat-card stat-duration">
+                                                      <div class="stat-value">{{ exam.duration or exam.duration_minutes or 60 }}</div>
+                                                      <div class="stat-label">
+                                                               <i class="bi bi-clock"></i> Minutes
+                                                      </div>
+                                             </div>
                                     </div>
-                                    <div class="card-body">
-                                             <table class="info-table">
-                                                      <tbody>
+                           </div>
+                  </div>
+         </div>
+         <!-- /top-grid -->
+         <!-- ========================== -->
+         <!-- BOTTOM 3-COLUMN SECTION -->
+         <!-- ========================== -->
+         <div class="bottom-grid">
+                  <!-- Exam Details Panel -->
+                  <details class="drawer panel-box">
+                           <summary class="drawer-toggle">
+                                    <i class="bi bi-info-circle"></i> Exam Details
+                           </summary>
+                           <div class="drawer-content">
+                                    <div class="card">
+                                             <div class="card-header">
+                                                      <h3 class="card-title">Overview</h3>
+                                             </div>
+                                             <div class="card-body">
+                                                      <table class="info-table">
                                                                <tr>
-                                                                        <td class="info-label">Duration</td>
-                                                                        <td class="info-value">{{ exam.duration_minutes or exam.duration or 60 }} minutes</td>
+                                                                        <td>Duration</td>
+                                                                        <td>{{ exam.duration_minutes or exam.duration or 60 }} minutes</td>
                                                                </tr>
                                                                <tr>
-                                                                        <td class="info-label">Passing Score</td>
-                                                                        <td class="info-value">{{ exam.passing_score or 40 }}%</td>
+                                                                        <td>Passing Score</td>
+                                                                        <td>{{ exam.passing_score or 40 }}%</td>
                                                                </tr>
                                                                <tr>
-                                                                        <td class="info-label">Status</td>
+                                                                        <td>Status</td>
                                                                         <td> {% if exam.is_active %} <span class="badge badge-success">Active</span> {% else %} <span class="badge badge-danger">Inactive</span> {% endif %} </td>
                                                                </tr>
                                                                <tr>
-                                                                        <td class="info-label">Start Time</td>
-                                                                        <td class="info-value">{{ exam.start_time or "Not set" }}</td>
+                                                                        <td>Start Time</td>
+                                                                        <td>{{ exam.start_time or "Not set" }}</td>
                                                                </tr>
                                                                <tr>
-                                                                        <td class="info-label">End Time</td>
-                                                                        <td class="info-value">{{ exam.end_time or "Not set" }}</td>
+                                                                        <td>End Time</td>
+                                                                        <td>{{ exam.end_time or "Not set" }}</td>
                                                                </tr>
-                                                      </tbody>
-                                             </table>
+                                                      </table>
+                                             </div>
                                     </div>
                            </div>
-                  </div>
-         </details>
-         <!-- Access Control Drawer -->
-         <details class="drawer">
-                  <summary class="drawer-toggle">
-                           <i class="bi bi-shield-lock"></i> Exam Access Control
-                  </summary>
-                  <div class="drawer-content">
-                           <div class="card">
-                                    <div class="card-header space-between">
-                                             <h3 class="card-title">Exam Access Control</h3>
-                                             <div id="access-status-badge"> {% if exam.is_active %} {% if exam.allow_all_students %} <span class="badge badge-success">Open to All</span> {% else %} <span class="badge badge-warning">Restricted Access</span> {% endif %} {% else %} <span class="badge badge-danger">Access Stopped</span> {% endif %} </div>
-                                    </div>
-                                    <div class="card-body">
-                                             <form method="POST" action="{{ url_for('update_exam_access', exam_id=exam.id) }}" id="access-form">
-                                                      <label class="form-label">Who can access this exam?</label>
-                                                      <!-- Stop Access -->
-                                                      <div class="access-option access-stopped">
-                                                               <label class="access-option-label">
-                                                                        <input type="radio" name="access_mode" value="stopped" id="radio-stopped" {% if not exam.is_active %}checked{% endif %}>
-                                                                        <div>
-                                                                                 <strong>
-                                                                                          <i class="bi bi-stop-circle"></i> Stop Exam Access </strong>
-                                                                                 <p>Disable the exam — No student can attempt it.</p>
-                                                                        </div>
-                                                               </label>
-                                                      </div>
-                                                      <!-- Allow All -->
-                                                      <div class="access-option access-all">
-                                                               <label class="access-option-label">
-                                                                        <input type="radio" name="access_mode" value="all" id="radio-all" {% if exam.is_active and exam.allow_all_students %}checked{% endif %}>
-                                                                        <div>
-                                                                                 <strong>
-                                                                                          <i class="bi bi-people"></i> Allow All Students </strong>
-                                                                                 <p>Any registered student can attempt this exam.</p>
-                                                                        </div>
-                                                               </label>
-                                                      </div>
-                                                      <!-- Specific -->
-                                                      <div class="access-option access-specific">
-                                                               <label class="access-option-label">
-                                                                        <input type="radio" name="access_mode" value="specific" id="radio-specific" {% if exam.is_active and not exam.allow_all_students %}checked{% endif %}>
-                                                                        <div>
-                                                                                 <strong>
-                                                                                          <i class="bi bi-person-check"></i> Allow Specific Students Only </strong>
-                                                                                 <p>Choose students individually or by batch.</p>
-                                                                        </div>
-                                                               </label>
-                                                               <button type="button" id="select-students-btn" class="btn btn-primary btn-select" {% if not(exam.is_active and not exam.allow_all_students) %}disabled{% endif %}>
-                                                                        <i class="bi bi-person-plus"></i> Select Students </button>
-                                                      </div>
-                                                      <input type="hidden" name="allowed_students" id="allowed-students-input" value="{{ exam.allowed_students or '' }}">
-                                                      <div id="selected-students-display" class="selected-students-box">
-                                                               <strong>Selected Students: <span id="selected-count">0</span>
-                                                               </strong>
-                                                               <div id="selected-students-list" class="students-list"></div>
-                                                      </div>
-                                                      <br>
-                                                      <button type="submit" class="btn btn-extend ">
-                                                               <i class="bi bi-check-circle"></i> Save Access Settings </button>
-                                             </form>
+                  </details>
+                  <!-- Exam Access Control -->
+                  <details class="drawer panel-box">
+                           <summary class="drawer-toggle">
+                                    <i class="bi bi-shield-lock"></i> Exam Access Control
+                           </summary>
+                           <div class="drawer-content">
+                                    <div class="card">
+                                             <div class="card-header space-between">
+                                                      <h3 class="card-title">Access Settings</h3>
+                                                      <div id="access-status-badge"> {% if exam.is_active %} {% if exam.allow_all_students %} <span class="badge badge-success">Open to All</span> {% else %} <span class="badge badge-warning">Restricted</span> {% endif %} {% else %} <span class="badge badge-danger">Stopped</span> {% endif %} </div>
+                                             </div>
+                                             <div class="card-body">
+                                                      <form method="POST" action="{{ url_for('update_exam_access', exam_id=exam.id) }}" id="access-form">
+                                                               <label class="form-label">Who can access the exam?</label>
+                                                               <!-- Stop -->
+                                                               <div class="access-option access-stopped">
+                                                                        <label class="access-option-label">
+                                                                                 <input type="radio" name="access_mode" value="stopped" id="radio-stopped" {% if not exam.is_active %}checked{% endif %}>
+                                                                                 <div>
+                                                                                          <strong>
+                                                                                                   <i class="bi bi-stop-circle"></i> Stop Access </strong>
+                                                                                          <p>No student can attempt the exam.</p>
+                                                                                 </div>
+                                                                        </label>
+                                                               </div>
+                                                               <!-- Allow All -->
+                                                               <div class="access-option access-all">
+                                                                        <label class="access-option-label">
+                                                                                 <input type="radio" name="access_mode" value="all" id="radio-all" {% if exam.is_active and exam.allow_all_students %}checked{% endif %}>
+                                                                                 <div>
+                                                                                          <strong>
+                                                                                                   <i class="bi bi-people"></i> Allow All Students </strong>
+                                                                                          <p>Any registered student may attempt.</p>
+                                                                                 </div>
+                                                                        </label>
+                                                               </div>
+                                                               <!-- Specific -->
+                                                               <div class="access-option access-specific">
+                                                                        <label class="access-option-label">
+                                                                                 <input type="radio" name="access_mode" value="specific" id="radio-specific" {% if exam.is_active and not exam.allow_all_students %}checked{% endif %}>
+                                                                                 <div>
+                                                                                          <strong>
+                                                                                                   <i class="bi bi-person-check"></i> Allow Specific Students </strong>
+                                                                                          <p>Select students manually or by batch.</p>
+                                                                                 </div>
+                                                                        </label>
+                                                                        <button type="button" id="select-students-btn" class="btn btn-primary btn-select" {% if not(exam.is_active and not exam.allow_all_students) %}disabled{% endif %}>
+                                                                                 <i class="bi bi-person-plus"></i> Select Students </button>
+                                                               </div>
+                                                               <input type="hidden" name="allowed_students" id="allowed-students-input" value="{{ exam.allowed_students or '' }}">
+                                                               <div id="selected-students-display" class="selected-students-box">
+                                                                        <strong>Selected Students: <span id="selected-count">0</span>
+                                                                        </strong>
+                                                                        <div id="selected-students-list" class="students-list"></div>
+                                                               </div>
+                                                               <br>
+                                                               <button type="submit" class="btn btn-extend">
+                                                                        <i class="bi bi-check-circle"></i> Save Settings </button>
+                                                      </form>
+                                             </div>
                                     </div>
                            </div>
-                  </div>
-         </details>
-         <!-- Questions Drawer -->
-         <details class="drawer">
-                  <summary class="drawer-toggle">
-                           <i class="bi bi-question-circle"></i> Questions ({{ exam.questions|length }})
-                  </summary>
-                  <div class="drawer-content">
-                           <div class="card">
-                                    <div class="card-header">
-                                             <h3 class="card-title">Questions</h3>
+                  </details>
+                  <!-- Questions -->
+                  <details class="drawer panel-box">
+                           <summary class="drawer-toggle">
+                                    <i class="bi bi-question-circle"></i> Questions ({{ exam.questions|length }})
+                           </summary>
+                           <div class="drawer-content">
+                                    <div class="card">
+                                             <div class="card-header">
+                                                      <h3 class="card-title">Questions</h3>
+                                             </div>
+                                             <div class="card-body"> {% if exam.questions %} <table class="table">
+                                                               <thead>
+                                                                        <tr>
+                                                                                 <th>#</th>
+                                                                                 <th>Question</th>
+                                                                                 <th>Marks</th>
+                                                                                 <th>Correct</th>
+                                                                        </tr>
+                                                               </thead>
+                                                               <tbody> {% for q in exam.questions %} <tr>
+                                                                                 <td>{{ loop.index }}</td>
+                                                                                 <td>{{ q.question_text }}</td>
+                                                                                 <td>{{ q.points }}</td>
+                                                                                 <td>{{ q.correct_answer }}</td>
+                                                                        </tr> {% endfor %} </tbody>
+                                                      </table> {% else %} <p class="empty">No questions added.</p> {% endif %} </div>
                                     </div>
-                                    <div class="card-body"> {% if exam.questions %} <table class="table">
-                                                      <thead>
-                                                               <tr>
-                                                                        <th>#</th>
-                                                                        <th>Question</th>
-                                                                        <th>Marks</th>
-                                                                        <th>Correct Answer</th>
-                                                               </tr>
-                                                      </thead>
-                                                      <tbody> {% for q in exam.questions %} <tr>
-                                                                        <td>{{ loop.index }}</td>
-                                                                        <td>{{ q.question_text }}</td>
-                                                                        <td>{{ q.points or 1 }}</td>
-                                                                        <td>{{ q.correct_answer }}</td>
-                                                               </tr> {% endfor %} </tbody>
-                                             </table> {% else %} <p class="text-center empty">No questions added yet.</p> {% endif %} </div>
                            </div>
-                  </div>
-         </details>
+                  </details>
+         </div>
+         <!-- /bottom-grid -->
 </div>
-<!-- Extend Time Modal -->
+<!-- /container -->
+<!-- ======================================================= -->
+<!-- EXTEND TIME MODAL -->
+<!-- ======================================================= -->
 <div id="extendTimeModal" class="custom-modal">
          <div class="modal-content modal-small">
                   <div class="modal-header">
@@ -219,146 +229,95 @@
                            <div class="modal-footer">
                                     <button type="button" onclick="hideExtendTimeModal()" class="btn btn-outline"> Cancel </button>
                                     <button type="submit" class="btn btn-primary">
-                                             <i class="bi bi-check-circle"></i> Extend Time </button>
+                                             <i class="bi bi-check-circle"></i> Extend </button>
                            </div>
                   </form>
          </div>
 </div>
-<!-- Student Selection Modal -->
-<!-- Student Selection Modal -->
+<!-- ======================================================= -->
+<!-- STUDENT SELECTION MODAL (FULL 3-COLUMN VERSION) -->
+<!-- ======================================================= -->
 <div id="student-selection-modal" class="custom-modal">
-    <div class="modal-content modal-xl">
+         <div class="modal-content modal-xl">
+                  <div class="modal-header">
+                           <h3>
+                                    <i class="bi bi-people"></i> Select Students for Exam Access
+                           </h3>
+                           <button class="modal-close" id="modal-close-btn">
+                                    <i class="bi bi-x"></i>
+                           </button>
+                  </div>
+                  <div class="modal-body student-modal-grid">
+                           <!-- COLUMN 1: FILTERS -->
+                           <div class="modal-column filters-panel">
+                                    <h4 class="column-title">
+                                             <i class="bi bi-funnel"></i> Filters
+                                    </h4>
+                                    <label class="form-label">Batch:</label>
+                                    <select id="batch-filter" class="form-input">
+                                             <option value="">Select Batch</option> {% for batch in all_batches %} <option value="{{ batch }}">{{ batch }}</option> {% endfor %}
+                                    </select>
+                                    <label class="form-label">Search:</label>
+                                    <input id="student-search" class="form-input" placeholder="Search name/PRN/roll">
+                                    <h4 class="column-title">
+                                             <i class="bi bi-list-ol"></i> Roll Range
+                                    </h4>
+                                    <input id="range-input" class="form-input" placeholder="e.g. 1-20, 25-40">
+                                    <button id="apply-range-btn" class="btn btn-primary btn-sm">Apply</button>
+                                    <button id="clear-range-btn" class="btn btn-outline btn-sm">Clear</button>
+                                    <div id="range-error" class="range-error"></div>
+                           </div>
+                           <!-- COLUMN 2: STUDENT LIST -->
+                           <div class="student-list student-grid">
+    {% for s in all_students %}
+    <label class="student-row"
+        data-student-id="{{ s.id }}"
+        data-batch="{{ s.batch or '' }}"
+        data-roll-id="{{ s.roll_id or '' }}">
 
-        <div class="modal-header">
-            <h3><i class="bi bi-people"></i> Select Students for Exam Access</h3>
-            <button class="modal-close" id="modal-close-btn">
-                <i class="bi bi-x"></i>
-            </button>
-        </div>
+        <input type="checkbox"
+               class="student-checkbox"
+               value="{{ s.id }}"
+               {% if exam.allowed_students and (s.id|string) in exam.allowed_students.split(',') %}checked{% endif %}>
 
-        <div class="modal-body student-modal-grid">
+        <div class="student-info">
+            <strong class="student-name">{{ s.full_name }}</strong>
 
-            <!-- ========================= -->
-            <!--  COLUMN 1: FILTERS PANEL  -->
-            <!-- ========================= -->
-            <div class="modal-column filters-panel">
-
-                <h4 class="column-title"><i class="bi bi-funnel"></i> Filters</h4>
-
-                <!-- Batch Filter -->
-                <label class="form-label">Batch:</label>
-                <select id="batch-filter" class="form-input">
-                    <option value="">Select Batch</option>
-                    {% for batch in all_batches %}
-                        <option value="{{ batch }}">{{ batch }}</option>
-                    {% endfor %}
-                </select>
-
-                <!-- Search Students -->
-                <label class="form-label">Search:</label>
-                <input id="student-search" class="form-input" placeholder="Search by name / PRN / roll">
-
-                <!-- Range Selector -->
-                <h4 class="column-title"><i class="bi bi-list-ol"></i> Select by Roll Range</h4>
-
-                <input type="text"
-                    id="range-input"
-                    class="form-input"
-                    placeholder="e.g. 1-20, 21-30">
-
-                <button id="apply-range-btn" class="btn btn-primary btn-sm">
-                    Apply Range
-                </button>
-
-                <button id="clear-range-btn" class="btn btn-outline btn-sm">
-                    Clear
-                </button>
-
-                <div id="range-error" class="range-error"></div>
-
+            <div class="student-meta">
+                Roll: {{ s.roll_id or 'N/A' }} • Batch: {{ s.batch or 'N/A' }}
+                {% if s.prn_number %}
+                    • PRN: {{ s.prn_number }}
+                {% endif %}
             </div>
 
-            <!-- ========================= -->
-            <!-- COLUMN 2: STUDENT LIST    -->
-            <!-- ========================= -->
-            <div class="modal-column student-list-column">
-
-                <h4 class="column-title">
-                    <i class="bi bi-list-check"></i> Students in Batch
-                </h4>
-
-                <div class="student-list">
-                    {% for s in all_students %}
-                    <label class="student-row"
-                        data-student-id="{{ s.id }}"
-                        data-batch="{{ s.batch or '' }}"
-                        data-roll-id="{{ s.roll_id or '' }}">
-
-                        <input type="checkbox"
-                            class="student-checkbox"
-                            value="{{ s.id }}"
-                            {% if exam.allowed_students and (s.id|string) in exam.allowed_students.split(',') %}
-                                checked
-                            {% endif %}
-                        >
-
-                        <div class="student-info">
-                            <strong class="student-name">{{ s.full_name }}</strong>
-                            <div class="student-meta">
-                                Roll: {{ s.roll_id or 'N/A' }} • Batch: {{ s.batch or 'N/A' }}
-                                {% if s.prn_number %}
-                                    • PRN: {{ s.prn_number }}
-                                {% endif %}
-                            </div>
-                        </div>
-                    </label>
-                    {% endfor %}
-                </div>
-
+            {% if student_exam_map.get(s.id) %}
+            <div class="student-tag">
+                Selected in: {{ student_exam_map[s.id] | join(", ") }}
             </div>
-
-            <!-- ========================= -->
-            <!-- COLUMN 3: QUICK ACTIONS   -->
-            <!-- ========================= -->
-            <div class="modal-column actions-panel">
-
-                <h4 class="column-title">
-                    <i class="bi bi-lightning-charge"></i> Quick Actions
-                </h4>
-
-                <button id="select-all-btn" class="btn btn-success btn-lg full-btn">
-                    Select All
-                </button>
-
-                <button id="deselect-all-btn" class="btn btn-danger btn-lg full-btn">
-                    Deselect All
-                </button>
-
-                <button id="select-evens-btn" class="btn btn-secondary btn-lg full-btn">
-                    Select Evens
-                </button>
-
-                <button id="select-odds-btn" class="btn btn-secondary btn-lg full-btn">
-                    Select Odds
-                </button>
-
-                <div class="selected-counter-box">
-                    Selected: <span id="modal-selected-count">0</span>
-                </div>
-            </div>
-
+            {% endif %}
         </div>
 
-        <div class="modal-footer">
-            <button id="modal-cancel-btn" class="btn btn-outline btn-lg">Cancel</button>
-            <button id="modal-save-btn" class="btn btn-primary btn-lg">
-                <i class="bi bi-save"></i> Save Selection
-            </button>
-        </div>
-
-    </div>
+    </label>
+    {% endfor %}
 </div>
-{% endblock %} 
-{% block extra_js %} 
-<script src="{{ url_for('static', filename='js/view_exam.js') }}"></script> 
-{% endblock %}
+
+                           <!-- COLUMN 3: QUICK ACTIONS -->
+                           <div class="modal-column actions-panel">
+                                    <h4 class="column-title">
+                                             <i class="bi bi-lightning-charge"></i> Quick Actions
+                                    </h4>
+                                    <button id="select-all-btn" class="btn btn-success btn-lg full-btn"> Select All </button>
+                                    <button id="deselect-all-btn" class="btn btn-danger btn-lg full-btn"> Deselect All </button>
+                                    <button id="select-evens-btn" class="btn btn-secondary btn-lg full-btn"> Select Evens </button>
+                                    <button id="select-odds-btn" class="btn btn-secondary btn-lg full-btn"> Select Odds </button>
+                                    <div class="selected-counter-box"> Selected: <span id="modal-selected-count">0</span>
+                                    </div>
+                           </div>
+                  </div>
+                  <div class="modal-footer">
+                           <button id="modal-cancel-btn" class="btn btn-outline btn-lg">Cancel</button>
+                           <button id="modal-save-btn" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-save"></i> Save Selection </button>
+                  </div>
+         </div>
+</div> {% endblock %} {% block extra_js %} <script src="{{ url_for('static', filename='js/view_exam.js') }}"></script> {% endblock %}

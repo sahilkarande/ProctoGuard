@@ -111,9 +111,9 @@
 }
 
 .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .stat-card {
@@ -122,7 +122,9 @@
     text-align: center;
     border: 2px solid;
 }
-
+.card {
+    border-radius: 12px;
+}
 .stat-card.stat-active {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.15));
     border-color: rgba(59, 130, 246, 0.3);
@@ -200,7 +202,8 @@
    ========================================== */
 
 .drawer {
-    margin-bottom: 1.5rem;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
 .drawer-toggle {
@@ -232,14 +235,49 @@
 }
 
 .drawer-content {
-    padding: 1.5rem;
+    padding: 20px;
     background: white;
     border: 2px solid #e5e7eb;
     border-top: none;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
+    width: 100%;
+    overflow: visible !important;   /* ensures nothing gets cut */
+    max-width: 100%;
 }
 
+.drawer-content .card-body {
+    width: 100%;
+    max-width: 100%;
+}
+.student-tag {
+    font-size: 11px;
+    margin-top: 2px;
+    padding: 2px 6px;
+    background: #0b7dda33;
+    border: 1px solid #0b7dda66;
+    border-radius: 6px;
+    width: fit-content;
+    color: #55c2ff;
+}
+/* Mobile Responsive — switch back to 1 column */
+@media (max-width: 900px) {
+    .student-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.drawer panel-box,
+.drawer .card {
+    width: 100%;
+}
+.drawer .card {
+    background: var(--panel-bg, #111827);
+    padding: 20px;
+    border-radius: 14px;
+    box-sizing: border-box;
+    overflow-x: auto;   /* allow horizontal scroll if needed */
+}
 [data-theme="dark"] .drawer-toggle {
     background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
     color: #e0e7ff;
@@ -267,6 +305,14 @@
 
 .info-table {
     width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.info-table td {
+    padding: 10px 6px;
+    word-wrap: break-word;
+     border-bottom: 1px solid #2c3648;
 }
 
 .info-table tr {
@@ -276,9 +322,11 @@
 .info-table tr:last-child {
     border-bottom: none;
 }
-
-.info-table td {
-    padding: 12px 8px;
+.badge {
+    white-space: nowrap;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
 }
 
 .info-label {
@@ -448,17 +496,15 @@
    ========================================== */
 
 .custom-modal {
-    display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 99999;
-    align-items: center;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #0007;
+    backdrop-filter: blur(4px);
+    display: none;
     justify-content: center;
-    backdrop-filter: blur(6px);
+    align-items: center;
+    z-index: 2000;
 }
 
 .custom-modal.active {
@@ -466,20 +512,27 @@
 }
 
 .modal-content {
-    background: white;
-    border-radius: 16px;
+    background: #182230;
+    border-radius: 14px;
+    padding: 20px;
     max-height: 90vh;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    color: white;
+    box-shadow: 0 0 20px #000;
 }
+
+
+.modal-lg { width: 550px; }
+.modal-xl { width: 900px; }
 
 .modal-small {
     width: 90%;
     max-width: 450px;
 }
-
+.modal-scroll {
+    max-height: 65vh;
+    overflow-y: auto;
+}
 .modal-large {
     width: 90%;
     max-width: 900px;
@@ -753,27 +806,42 @@
     scroll-behavior: smooth;
 }
 [data-theme="dark"] .student-list {
-    background: rgba(99, 102, 241, 0.2);
+    background: rgb(17, 17, 43);
     
+}
+
+.student-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;     /* TWO COLUMNS */
+    gap: 12px;
+    padding-right: 5px;
+    overflow-y: auto;
 }
 
 /* Individual student row */
 .student-row {
     display: grid;
-    grid-template-columns: 30px 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* FIXES GRID SHRINKING */
     gap: 10px;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
+    padding: 12px;
+    background: #141a27;
+    border: 1px solid #2a3244;
+    border-radius: 10px;
     cursor: pointer;
+    transition: 0.2s;
+    
 }
+
 
 .student-row:hover {
-    background: #919191;
+    background: #1f2636;
 }
 
-/* Checkbox */
-.student-row input[type="checkbox"] {
-    transform: scale(1.2);
+.student-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+    margin-top: 5px;
 }
 
 /* Main student info */
@@ -854,8 +922,9 @@
 }
 
 .student-info {
-    flex: 1;
-    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .student-number {
@@ -870,16 +939,13 @@
 }
 
 .student-name {
-    display: block;
-    font-size: 1rem;
-    margin-bottom: 4px;
-    color: #1f2937;
+    font-size: 15px;
     font-weight: 600;
 }
 
 .student-meta {
-    font-size: 0.85rem;
-    color: #6b7280;
+    font-size: 12px;
+    opacity: 0.7;
 }
 
 .empty-state {
@@ -1024,5 +1090,41 @@
     margin-bottom: 10px;
     font-weight: 700;
     font-size: 16px;
+}
+
+/* TOP 2-COLUMN GRID */
+.top-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.panel-box {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* BOTTOM 3-COLUMN GRID */
+.bottom-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .bottom-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 780px) {
+    .top-grid {
+        grid-template-columns: 1fr;
+    }
+    .bottom-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
