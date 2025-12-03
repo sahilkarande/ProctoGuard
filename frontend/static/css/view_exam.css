@@ -714,12 +714,115 @@
     max-height: 400px;
     overflow-y: auto;
 }
-
-#student-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 12px;
+/* Make modal wider and spacious */
+.modal-large {
+    width: 90%;
+    max-width: 1300px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
 }
+
+/* Scroll only the content section */
+.modal-body {
+    overflow-y: auto;
+    padding: 20px;
+    max-height: calc(90vh - 140px);
+}
+
+/* Section title */
+.section-title {
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Student List container */
+.student-list-container {
+    margin-top: 20px;
+}
+
+/* The scrollable list itself */
+.student-list {
+    flex: 1;
+    overflow-y: auto !important;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fafafa;
+    scroll-behavior: smooth;
+}
+[data-theme="dark"] .student-list {
+    background: rgba(99, 102, 241, 0.2);
+    
+}
+
+/* Individual student row */
+.student-row {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 10px;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.student-row:hover {
+    background: #919191;
+}
+
+/* Checkbox */
+.student-row input[type="checkbox"] {
+    transform: scale(1.2);
+}
+
+/* Main student info */
+.student-main {
+    display: flex;
+    flex-direction: column;
+}
+.student-modal-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 260px;
+    gap: 20px;
+    height: calc(90vh - 160px);
+}
+
+.student-list-column {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+
+.modal-xl {
+    width: 95%;
+    max-width: 1600px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+.student-meta {
+    font-size: 13px;
+    color: #666;
+}
+
+/* Index bubble on right */
+.student-index {
+    background: #e2e8f0;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    text-align: center;
+    color: #333;
+}
+
+.empty-state {
+    padding: 15px;
+    text-align: center;
+    color: #888;
+}
+
 
 .student-item {
     background: white;
@@ -752,6 +855,7 @@
 
 .student-info {
     flex: 1;
+    font-weight: 600;
 }
 
 .student-number {
@@ -770,6 +874,7 @@
     font-size: 1rem;
     margin-bottom: 4px;
     color: #1f2937;
+    font-weight: 600;
 }
 
 .student-meta {
@@ -799,7 +904,7 @@
 }
 
 [data-theme="dark"] .student-name {
-    color: #e0e7ff;
+    color: #ffffff;
 }
 
 [data-theme="dark"] .student-meta {
@@ -899,3 +1004,25 @@
     background: rgba(99, 102, 241, 0.2);
     color: #a5b4fc;
 }
+/* Filters panel styling */
+.filters-panel input,
+.filters-panel select {
+    margin-bottom: 10px;
+}
+.selected-counter-box {
+    margin-top: 20px;
+    font-size: 16px;
+    font-weight: bold;
+}
+/* Quick actions buttons */
+.full-btn {
+    width: 100%;
+    margin-bottom: 10px;
+}
+/* Column headers */
+.column-title {
+    margin-bottom: 10px;
+    font-weight: 700;
+    font-size: 16px;
+}
+

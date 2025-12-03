@@ -4111,11 +4111,8 @@ select {
    STUDENT LISTS
    =================================== */
 
-#student-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.9rem;
-}
+/* Smooth scroll for student list */
+
 
 /* ===================================
    PROFILE SECTION
@@ -6179,7 +6176,7 @@ tbody td strong {
 
 /* Dark theme styles */
 [data-theme="dark"] .student-name {
-    color: rgb(255, 255, 255);
+    color: black;
 }
 
 [data-theme="dark"] .student-prn {
