@@ -42,47 +42,55 @@
                      onclick="window.location.href='{{ url_for('index') }}'">
             </div>
             
-            <div class="nav-links">
-                {% if current_user.is_authenticated %}
-                    <!-- Theme Toggle Button -->
+           <div class="nav-links">
 
+    {% if current_user.is_authenticated %}
 
-                    <!-- User Info -->
-                    <span class="user-info">
-                        <i class="bi bi-person-circle"></i>
-                        {{ current_user.full_name or current_user.username }}
-                        <span style="color: var(--primary-color); font-weight: 700;">• {{ current_user.role }}</span>
-                    </span>
-                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle Light/Dark Mode">
-                        <span class="icon-sun">☀️</span>
-                        <span class="icon-moon">🌙</span>
-                    </button>
-                    <a href="javascript:history.back()" class="btn-back">
-                        ⬅
-                    </a>
-                    
-                    <!-- Logout Button -->
-                    <a href="{{ url_for('logout') }}" class="btn btn-outline">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
+        <!-- THEME TOGGLE -->
+        <button class="btn-theme" id="themeToggle">
+            <span class="icon-sun">☀️</span>
+            <span class="icon-moon">🌙</span>
+        </button>
 
+        <!-- BACK BUTTON -->
+        <a href="javascript:history.back()" class="btn-back">
+            ⬅
+        </a>
 
-                {% else %}
-                    <!-- Theme Toggle Button (Guest) -->
-                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle Light/Dark Mode">
-                        <span class="icon-sun">☀️</span>
-                        <span class="icon-moon">🌙</span>
-                    </button>
+        <!-- LOGOUT BUTTON -->
+        <a href="{{ url_for('logout') }}" class="btn-outline">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
 
-                    <!-- Guest Navigation Links -->
-                    <a href="{{ url_for('index') }}" class="btn btn-outline">
-                        <i class="bi bi-house"></i> Home
-                    </a>
-                    <a href="{{ url_for('login') }}" class="btn btn-outline">
-                        <i class="bi bi-box-arrow-in-right"></i> Login
-                    </a>
-                {% endif %}
-            </div>
+        <!-- USER INFO -->
+        <span class="user-info">
+            <i class="bi bi-person-circle"></i>
+            {{ current_user.full_name or current_user.username }}
+            <strong style="color: var(--primary-color);">• {{ current_user.role }}</strong>
+        </span>
+
+    {% else %}
+
+        <!-- THEME TOGGLE -->
+        <button class="btn-theme" id="themeToggle">
+            <span class="icon-sun">☀️</span>
+            <span class="icon-moon">🌙</span>
+        </button>
+
+        <!-- HOME BUTTON -->
+        <a href="{{ url_for('index') }}" class="btn-outline">
+            <i class="bi bi-house"></i> Home
+        </a>
+
+        <!-- LOGIN BUTTON -->
+        <a href="{{ url_for('login') }}" class="btn-outline">
+            <i class="bi bi-box-arrow-in-right"></i> Login
+        </a>
+
+    {% endif %}
+
+</div>
+
         </div>
     </nav>
 

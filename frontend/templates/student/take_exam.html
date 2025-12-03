@@ -3,10 +3,148 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/exam.css') }}">
+<!-- Inline overrides to ensure camera visibility and a couple of safety tweaks -->
+<style>
+/* Ensure student camera is above calibration modal and overlays */
+.student-camera-box {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: black;
+    border: 4px solid #6366f1;
+    /* Raised z-index so camera is visible above modals/overlays */
+    z-index: 11000 !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+}
+
+/* Keep video covering the box */
+.student-camera-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Circle overlay inside camera box */
+.student-camera-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 85%;
+    height: 85%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 3px dashed rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    /* Above the video but below any critical UI */
+    z-index: 11001 !important;
+}
+
+/* Calibration modal (kept below camera by z-index) */
+.calibration-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(139, 92, 246, 0.95) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000; /* intentionally below .student-camera-box */
+    backdrop-filter: blur(10px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Blocked view */
+.blocked-view {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 1000;
+    padding: 48px;
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 600px;
+}
+
+/* Fullscreen overlay (hidden by default) */
+.fullscreen-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+    backdrop-filter: blur(20px);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* Small helper animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
 {% endblock %}
 
 {% block content %}
-<!-- Header -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- CALIBRATION MODAL (Full-Screen) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="proctor-modal" class="calibration-modal" aria-hidden="false">
+    <div class="calibration-container" role="dialog" aria-modal="true" aria-labelledby="calib-title">
+        <div class="calibration-header">
+            <div class="calibration-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <h2 id="calib-title">Face Calibration</h2>
+            <p>We need to calibrate your face for proctoring. Please ensure good lighting and look directly at the camera.</p>
+        </div>
+
+        <div class="camera-preview" aria-hidden="false">
+            <video id="calib-video" autoplay playsinline muted></video>
+            <div class="camera-overlay"></div>
+        </div>
+
+        <div id="calibration-status" class="calibration-status info" role="status" aria-live="polite">
+            Initializing camera...
+        </div>
+
+        <button id="btn-calibrate" class="calibration-button" disabled>
+            <svg class="button-icon" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+            </svg>
+            Start Calibration
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- BLOCKED VIEW (Shown until calibration succeeds) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div id="blocked-view" class="blocked-view" aria-hidden="true">
+    <div class="blocked-view-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+    </div>
+    <h2>Face Calibration Required</h2>
+    <p>Please complete the face calibration to begin your examination. This ensures secure proctoring throughout your exam.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- EXAM HEADER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
 <div class="exam-header">
     <div class="header-content">
         <div class="exam-info">
@@ -26,8 +164,10 @@
     </div>
 </div>
 
-<!-- Main Container -->
-<main class="exam-container">
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MAIN EXAM CONTAINER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<main class="exam-container" role="main">
     <!-- Instructions Panel -->
     <div class="instructions-panel">
         <div class="panel-header">
@@ -37,174 +177,230 @@
             <h2>Exam Instructions</h2>
         </div>
         <ul class="instructions-list">
-            <li>
-                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-                Stay in fullscreen mode throughout the exam duration
-            </li>
-            <li>
-                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-                Do not switch tabs or windows during the examination
-            </li>
-            <li>
-                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-                All answers are automatically saved in real-time
-            </li>
-            <li>
-                <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                </svg>
-                Unanswered questions will be marked as <strong>incorrect (0 points)</strong>
-            </li>
+            <li>Stay in fullscreen mode throughout the exam duration</li>
+            <li>Do not switch tabs or windows during the examination</li>
+            <li>All answers are automatically saved in real-time</li>
+            <li>Unanswered questions will be marked as <strong>incorrect (0 points)</strong></li>
         </ul>
     </div>
 
-    <!-- Exam Form -->
-    <form id="exam-form" class="exam-form">
-        {% for question in questions %}
-        <article class="question-card" data-qid="{{ question.id }}">
-            <div class="question-header">
-                <span class="question-number">Question {{ loop.index }}</span>
-                <span class="question-count">{{ loop.index }} of {{ questions|length }}</span>
-            </div>
-            
-            <div class="question-text">{{ question.question_text|safe }}</div>
-            
-            <div class="options">
-                <!-- Option A -->
-                {% if question.option_a %}
-                <label class="option {% if existing_answers.get(question.id) == 'A' %}selected{% endif %}">
-                    <input type="radio"
-                        name="question_{{ question.id }}"
-                        value="A"
-                        data-question-id="{{ question.id }}"
-                        {% if existing_answers.get(question.id) == 'A' %}checked{% endif %}>
-                    <span class="option-letter">A</span>
-                    <span class="option-text">{{ question.option_a|safe }}</span>
-                    <span class="option-checkmark">
-                        <svg viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                        </svg>
-                    </span>
-                </label>
-                {% endif %}
+    <!-- Student camera box (floating, above modals) -->
+<!-- STUDENT CAMERA FLOATING BOX (Visible only after calibration) -->
+    <div id="student-camera-box" class="student-camera-box" style="display:none;">
+        <video id="student-camera" autoplay playsinline muted></video>
+        <div class="camera-label">You are being monitored</div>
+    </div>
 
-                <!-- Option B -->
-                {% if question.option_b %}
-                <label class="option {% if existing_answers.get(question.id) == 'B' %}selected{% endif %}">
-                    <input type="radio"
-                        name="question_{{ question.id }}"
-                        value="B"
-                        data-question-id="{{ question.id }}"
-                        {% if existing_answers.get(question.id) == 'B' %}checked{% endif %}>
-                    <span class="option-letter">B</span>
-                    <span class="option-text">{{ question.option_b|safe }}</span>
-                    <span class="option-checkmark">
-                        <svg viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                        </svg>
-                    </span>
-                </label>
-                {% endif %}
 
-                <!-- Option C -->
-                {% if question.option_c %}
-                <label class="option {% if existing_answers.get(question.id) == 'C' %}selected{% endif %}">
-                    <input type="radio"
-                        name="question_{{ question.id }}"
-                        value="C"
-                        data-question-id="{{ question.id }}"
-                        {% if existing_answers.get(question.id) == 'C' %}checked{% endif %}>
-                    <span class="option-letter">C</span>
-                    <span class="option-text">{{ question.option_c|safe }}</span>
-                    <span class="option-checkmark">
-                        <svg viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                        </svg>
-                    </span>
-                </label>
-                {% endif %}
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- EXAM QUESTIONS (Hidden until calibration) -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="exam-questions-container" aria-hidden="true">
+        <form id="exam-form" class="exam-form">
+            {% for question in questions %}
+            <article class="question-card" data-qid="{{ question.id }}">
+                <div class="question-header">
+                    <span class="question-number">Question {{ loop.index }}</span>
+                    <span class="question-count">{{ loop.index }} of {{ questions|length }}</span>
+                </div>
 
-                <!-- Option D -->
-                {% if question.option_d %}
-                <label class="option {% if existing_answers.get(question.id) == 'D' %}selected{% endif %}">
-                    <input type="radio"
-                        name="question_{{ question.id }}"
-                        value="D"
-                        data-question-id="{{ question.id }}"
-                        {% if existing_answers.get(question.id) == 'D' %}checked{% endif %}>
-                    <span class="option-letter">D</span>
-                    <span class="option-text">{{ question.option_d|safe }}</span>
-                    <span class="option-checkmark">
-                        <svg viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-                        </svg>
-                    </span>
-                </label>
-                {% endif %}
-            </div>
-        </article>
-        {% endfor %}
+                <div class="question-text">{{ question.question_text|safe }}</div>
 
-        <button type="button" id="submit-btn" class="submit-button">
-            <svg class="button-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-            </svg>
-            Submit Exam
-        </button>
-    </form>
+                <div class="options">
+                    {% if question.option_a %}
+                    <label class="option {% if existing_answers.get(question.id) == 'A' %}selected{% endif %}">
+                        <input type="radio"
+                            name="question_{{ question.id }}"
+                            value="A"
+                            data-question-id="{{ question.id }}"
+                            {% if existing_answers.get(question.id) == 'A' %}checked{% endif %}>
+                        <span class="option-letter">A</span>
+                        <span class="option-text">{{ question.option_a|safe }}</span>
+                        <span class="option-checkmark" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                        </span>
+                    </label>
+                    {% endif %}
+
+                    {% if question.option_b %}
+                    <label class="option {% if existing_answers.get(question.id) == 'B' %}selected{% endif %}">
+                        <input type="radio"
+                            name="question_{{ question.id }}"
+                            value="B"
+                            data-question-id="{{ question.id }}"
+                            {% if existing_answers.get(question.id) == 'B' %}checked{% endif %}>
+                        <span class="option-letter">B</span>
+                        <span class="option-text">{{ question.option_b|safe }}</span>
+                        <span class="option-checkmark" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                        </span>
+                    </label>
+                    {% endif %}
+
+                    {% if question.option_c %}
+                    <label class="option {% if existing_answers.get(question.id) == 'C' %}selected{% endif %}">
+                        <input type="radio"
+                            name="question_{{ question.id }}"
+                            value="C"
+                            data-question-id="{{ question.id }}"
+                            {% if existing_answers.get(question.id) == 'C' %}checked{% endif %}>
+                        <span class="option-letter">C</span>
+                        <span class="option-text">{{ question.option_c|safe }}</span>
+                        <span class="option-checkmark" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                        </span>
+                    </label>
+                    {% endif %}
+
+                    {% if question.option_d %}
+                    <label class="option {% if existing_answers.get(question.id) == 'D' %}selected{% endif %}">
+                        <input type="radio"
+                            name="question_{{ question.id }}"
+                            value="D"
+                            data-question-id="{{ question.id }}"
+                            {% if existing_answers.get(question.id) == 'D' %}checked{% endif %}>
+                        <span class="option-letter">D</span>
+                        <span class="option-text">{{ question.option_d|safe }}</span>
+                        <span class="option-checkmark" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                            </svg>
+                        </span>
+                    </label>
+                    {% endif %}
+                </div>
+            </article>
+            {% endfor %}
+
+            <button type="button" id="submit-btn" class="submit-button">
+                <svg class="button-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                </svg>
+                Submit Exam
+            </button>
+        </form>
+    </div>
 </main>
 
-<!-- Proctor Badge -->
-<div class="proctor-badge">
+<!-- PROCTOR BADGE -->
+<div class="proctor-badge" aria-hidden="true">
     <svg class="shield-icon" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
     </svg>
     <span>Proctored Mode Active</span>
 </div>
 
-<!-- Fullscreen Overlay -->
-<div id="fs-overlay" class="fullscreen-overlay">
+<!-- FULLSCREEN OVERLAY -->
+<div id="fs-overlay" class="fullscreen-overlay" aria-hidden="true">
     <div class="overlay-content">
-        <div class="overlay-icon">
+        <div class="overlay-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M7 7h4v4M17 7h-4v4M7 17h4v-4M17 17h-4v-4"/>
             </svg>
         </div>
         <h1 class="overlay-title">Fullscreen Required</h1>
         <p class="overlay-message">Please enter fullscreen mode to continue your examination. This ensures a distraction-free testing environment.</p>
-        <button id="fs-enter-btn" class="fullscreen-button">
-            <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 7h4v4M17 7h-4v4M7 17h4v-4M17 17h-4v-4"/>
-            </svg>
-            Enter Fullscreen Mode
-        </button>
+        <button id="fs-enter-btn" class="fullscreen-button">Enter Fullscreen Mode</button>
     </div>
 </div>
 
-<!-- Hidden Submit Form -->
-<form id="submit-form" method="POST" action="{{ url_for('submit_exam', student_exam_id=student_exam.id) }}"></form>
 
-<script src="{{ url_for('static', filename='js/exam.js') }}?v=2"></script>
+
+<!-- SOCKET.IO -->
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+<!-- EXAM JAVASCRIPT -->
+<script src="{{ url_for('static', filename='js/exam.js') }}?v=3"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("🎓 Initializing exam...");
-    console.log("Student Exam ID:", {{ student_exam.id }});
-    console.log("Time Remaining (minutes):", {{ time_remaining }});
-    
-    initExam({
-        studentExamId: {{ student_exam.id }},
-        timeRemaining: {{ time_remaining }},  // This is in MINUTES
-        maxTabSwitches: {{ exam.max_tab_switches or 3 }},
-        initialTabSwitchCount: {{ student_exam.tab_switch_count or 0 }},
-        showTabSwitches: true
-    });
+    console.log("🎯 Initializing exam...");
+    // Safely embed server-side variables into JS using tojson
+    const studentExamId = {{ student_exam.id | tojson }};
+    const timeRemaining = {{ time_remaining | tojson }};
+    const maxTabSwitches = {{ (exam.max_tab_switches or 3) | tojson }};
+    const initialTabSwitchCount = {{ (student_exam.tab_switch_count or 0) | tojson }};
+
+    console.log("Student Exam ID:", studentExamId);
+    console.log("Time Remaining (minutes):", timeRemaining);
+
+    // Start camera for floating student preview and calibration video
+    startStudentCamera();
+
+    // Initialize exam (assumes initExam is defined in external exam.js)
+    if (typeof initExam === "function") {
+        initExam({
+            studentExamId: studentExamId,
+            timeRemaining: timeRemaining,  // This is in MINUTES
+            maxTabSwitches: maxTabSwitches,
+            initialTabSwitchCount: initialTabSwitchCount,
+            showTabSwitches: true
+        });
+    } else {
+        console.warn("initExam() not found. Ensure static/js/exam.js is loaded and defines initExam.");
+    }
 });
+
+/**
+ * Start the student's floating camera and calibration preview.
+ * Streams the same camera into both the floating preview and calib preview where possible.
+ */
+async function startStudentCamera() {
+    const studentVideo = document.getElementById("student-camera");
+    const calibVideo = document.getElementById("calib-video");
+    const statusEl = document.getElementById("calibration-status");
+    const calibrateBtn = document.getElementById("btn-calibrate");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("getUserMedia not supported in this browser");
+        if (statusEl) statusEl.textContent = "Camera API not supported in this browser.";
+        return;
+    }
+
+    try {
+        // Request a reasonably small resolution to reduce bandwidth and CPU
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+            audio: false
+        });
+
+        // Attach stream to both video elements (some browsers require separate streams; share if possible)
+        try {
+            studentVideo.srcObject = stream;
+            if (calibVideo) calibVideo.srcObject = stream;
+        } catch (e) {
+            // Fallback: if browser doesn't allow sharing stream, try cloning tracks
+            const clonedStream = new MediaStream(stream.getVideoTracks().map(t => t.clone()));
+            studentVideo.srcObject = stream;
+            if (calibVideo) calibVideo.srcObject = clonedStream;
+        }
+
+        // Ensure videos will play
+        await studentVideo.play().catch(() => {/* autoplay might be blocked until user gesture */});
+        if (calibVideo) await calibVideo.play().catch(() => {/* may be blocked */});
+
+        // Update status and enable calibration button
+        if (statusEl) statusEl.textContent = "Camera ready. Click 'Start Calibration' to continue.";
+        if (calibrateBtn) calibrateBtn.disabled = false;
+
+    } catch (err) {
+        console.error("Camera error:", err);
+        if (statusEl) {
+            let msg = "Unable to access camera. Please allow camera permissions and refresh the page.";
+            if (err && err.name === "NotAllowedError") {
+                msg = "Camera permission denied. Please allow camera access in your browser settings.";
+            } else if (err && err.name === "NotFoundError") {
+                msg = "No camera found. Please connect a camera and refresh the page.";
+            }
+            statusEl.textContent = msg;
+        }
+    }
+}
 </script>
 {% endblock %}

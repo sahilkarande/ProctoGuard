@@ -48,6 +48,10 @@ class User(db.Model, UserMixin):
     created_exams = db.relationship('Exam', backref='creator', lazy=True, foreign_keys='Exam.creator_id')
     student_exams = db.relationship('StudentExam', backref='student', lazy=True, foreign_keys='StudentExam.student_id')
 
+    # In models.py → StudentExam model
+
+    total_violations = db.Column(db.Integer, default=0)
+
     # ===========================
     # Helper Methods
     # ===========================
@@ -234,6 +238,9 @@ class StudentExam(db.Model):
     activity_logs = db.relationship('ActivityLog', backref='student_exam', lazy=True, cascade='all, delete-orphan')
     calibration = db.relationship('ExamCalibration', backref='student_exam', uselist=False, cascade='all, delete-orphan')
     violations = db.relationship('ExamViolation', backref='student_exam', lazy=True, cascade='all, delete-orphan')
+    no_face_count = db.Column(db.Integer, default=0)
+    multiple_faces_count = db.Column(db.Integer, default=0)
+    total_violations = db.Column(db.Integer, default=0)
 
     # Helpers
     def get_question_order(self):

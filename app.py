@@ -1,8 +1,6 @@
 """
 Secure Proctored Exam Platform
-Main Application File - Enhanced Version with Proper Session Management
-+ Integrated Admin SQL Console
-+ Fixed Back Button Behavior (smart caching)
+Main Application File - Enhanced Version with Socket.IO Binary Proctoring
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
@@ -15,10 +13,8 @@ import traceback
 from datetime import timedelta
 from models import User, Exam, Question, StudentExam, StudentAnswer, ActivityLog
 
-
 # Load environment variables
 load_dotenv()
-
 
 def create_app():
     """Application factory"""
@@ -27,19 +23,19 @@ def create_app():
         template_folder='frontend/templates',
         static_folder='frontend/static'
     )
+    
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///exam_platform.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))
     
-    # Session configuration for better security and proper back button behavior
+    # Session configuration
     app.config['SESSION_COOKIE_SECURE'] = False  # Set True in production with HTTPS
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
-
 
     # ==============================================================
     # INITIALIZE EXTENSIONS
@@ -49,7 +45,14 @@ def create_app():
     login_manager.login_view = 'login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
-    login_manager.session_protection = 'strong'  # Prevent session hijacking
+    login_manager.session_protection = 'strong'
+
+    # ==============================================================
+    # INITIALIZE SOCKET.IO ⚠️ CRITICAL FOR BINARY PROCTORING
+    # ==============================================================
+    from backend.routes import socketio
+    socketio.init_app(app)
+    print("✅ Socket.IO initialized for binary proctoring")
 
     # ==============================================================
     # CACHE CONTROL (SMART BACK BUTTON FIX)
@@ -69,18 +72,11 @@ def create_app():
             response.headers['Expires'] = '0'
             return response
 
-        # Public pages (landing, help, etc.)
+        # Public pages
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         return response
-
-
-    # ==============================================================
-    # MODEL IMPORTS
-    # ==============================================================
-
-
 
     # ==============================================================
     # LOGIN MANAGER HELPERS
@@ -88,20 +84,11 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
-        from datetime import datetime
-
-
-
 
     @login_manager.unauthorized_handler
     def unauthorized():
         flash('Please log in to access this page.', 'warning')
         return redirect(url_for('login'))
-
-    # ==============================================================
-    # LOGOUT HANDLER
-    # ==============================================================
-
 
     # ==============================================================
     # ROUTE REGISTRATION
@@ -192,7 +179,7 @@ if __name__ == '__main__':
     app = create_app()
 
     print("\n" + "=" * 70)
-    print("🎓 PROCTORED EXAM PLATFORM - PRODUCTION READY")
+    print("🎯 PROCTORED EXAM PLATFORM - PRODUCTION READY")
     print("=" * 70)
     print("🌐 Server URL: http://localhost:5000")
     print("🌐 Network URL: http://0.0.0.0:5000")
@@ -204,17 +191,26 @@ if __name__ == '__main__':
     print("   ✓ Back Button Fix (no reload to login)")
     print("   ✓ PDF Result Download")
     print("   ✓ Student Analytics Dashboard")
-    print("   ✓ Real-time Proctoring")
+    print("   ✓ Real-time Binary Proctoring (Socket.IO)")  # ← UPDATED
+    print("   ✓ Fast Face Calibration (<0.5s)")           # ← NEW
+    print("   ✓ Violation Detection & Auto-Submit")       # ← NEW
     print("   ✓ Admin SQL Console")
     print("   ✓ Bulk Import/Export (CSV/Excel)")
     print("   ✓ Secure Cache Control")
-    print("\n📚 Documentation: README.md")
+    print("\n📚 Documentation: IMPLEMENTATION_GUIDE.md")
     print("🆘 Help: START_HERE.txt")
     print("=" * 70 + "\n")
 
-    app.run(
+    # ==============================================================
+    # ⚠️ CRITICAL: USE SOCKETIO.RUN() NOT APP.RUN()
+    # ==============================================================
+    from backend.routes import socketio
+    
+    socketio.run(
+        app,
         debug=os.getenv('FLASK_DEBUG', 'True') == 'True',
         host='0.0.0.0',
-        port=5000,
-        threaded=True
+        port=8900,
+        ssl_context=('cert.pem', 'key.pem'),
+        allow_unsafe_werkzeug=True
     )

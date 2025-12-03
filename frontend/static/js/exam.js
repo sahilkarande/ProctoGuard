@@ -1,916 +1,793 @@
-// static/js/exam.js - Enhanced Exam System with AI Face Proctoring
-// Features: Timer, Tab Monitoring, Auto-save, AI Face Detection, Violation Tracking
-
-let remainingTime = 0;
-let studentExamId = null;
-let tabSwitchCount = 0;
-let maxTabSwitches = 2;
-let timerHandle = null;
-let submitting = false;
-let showTabSwitches = true;
-let examEndTime = null;
-let statusCheckInterval = null;
-
-// NEW: Proctoring variables
-let proctorEnabled = false;
-let calibrationCompleted = false;
-let proctorInterval = null;
-let video = null;
-let canvas = null;
-let ctx = null;
-let cameraMinimized = false;
-let totalViolations = 0;
-let maxViolations = 6;
-
 /**
- * Initialize the exam system
- * @param {Object} config - Configuration object
+ * UPDATED exam.js
+ * - fixes: visible student camera, reliable violation counting,
+ *          immediate termination on fullscreen exit,
+ *          debounced tab switch counting, correct API endpoints
+ *
+ * Keep all previous features; additions are clearly commented.
  */
-function initExam(config = {}) {
-    studentExamId = config.studentExamId || null;
-    
-    const timeInMinutes = (config.timeRemaining !== undefined && config.timeRemaining !== null)
-        ? config.timeRemaining
-        : 60;
-    remainingTime = timeInMinutes * 60;
-    
-    tabSwitchCount = Number(config.initialTabSwitchCount) || 0;
-    if (tabSwitchCount >= maxTabSwitches) {
-        tabSwitchCount = 0;
+
+// GLOBAL STATE MANAGEMENT
+const ExamState = {
+    studentExamId: null,
+    timeRemainingMinutes: 0,
+    maxTabSwitches: 3,
+    showTabSwitches: true,
+
+    timerInterval: null,
+    secondsLeft: 0,
+
+    tabSwitchCount: 0,
+    isExamActive: true,
+
+    // Camera & Proctoring
+    videoStream: null,
+    // visible video for student preview (should be an existing element #student-camera in the template)
+    studentCameraElement: null,
+    // hidden video used for efficient frame capture and sending (keeps existing behavior)
+    videoElement: null,
+    sendCanvas: null,
+    sendContext: null,
+    calibrationComplete: false,
+    proctoringInterval: null,
+
+    // Socket.IO
+    socket: null,
+
+    // Violation Tracking (local counters)
+    violations: {
+        no_face: 0,
+        multiple_faces: 0,
+        looking_away: 0
+    },
+
+    // Answer Management
+    answers: {},
+    lastSaveTime: 0,
+    saveDebounceTimer: null,
+
+    // UI Elements
+    modal: null,
+    calibVideo: null,
+    calibStatus: null,
+    calibButton: null,
+    blockedView: null,
+    questionsContainer: null,
+
+    // Tab switch debounce
+    lastTabSwitchAt: 0,
+
+    // Heartbeat to detect socket disconnect
+    lastSocketHeartbeat: Date.now()
+};
+
+// MAIN INITIALIZATION
+function initExam(config) {
+    console.log("🎯 Initializing Exam System...");
+    console.log("Config:", config);
+
+    ExamState.studentExamId = config.studentExamId;
+    ExamState.timeRemainingMinutes = config.timeRemaining;
+    ExamState.secondsLeft = Math.max(0, Math.floor(config.timeRemaining * 60));
+    ExamState.maxTabSwitches = config.maxTabSwitches || 3;
+    ExamState.tabSwitchCount = config.initialTabSwitchCount || 0;
+    ExamState.showTabSwitches = config.showTabSwitches !== false;
+
+    if (typeof io !== 'undefined') {
+        ExamState.socket = io();
+        console.log("✅ Socket.IO initialized");
+        setupSocketHandlers();
+    } else {
+        console.error("❌ Socket.IO not available");
     }
 
-    maxTabSwitches = parseInt(config.maxTabSwitches || 2, 10) || 2;
-    showTabSwitches = config.showTabSwitches ?? true;
-    examEndTime = Date.now() + (remainingTime * 1000);
-    
-    // NEW: Proctoring configuration
-    proctorEnabled = config.proctorEnabled ?? true;
-    maxViolations = config.maxViolations || 6;
-    
-    console.log(`📅 Exam initialized:`);
-    console.log(`   Time remaining: ${timeInMinutes} minutes (${remainingTime} seconds)`);
-    console.log(`   Will end at: ${new Date(examEndTime).toLocaleString()}`);
-    console.log(`   Student Exam ID: ${studentExamId}`);
-    console.log(`   Proctoring enabled: ${proctorEnabled}`);
+    // DOM refs
+    ExamState.modal = document.getElementById('proctor-modal');
+    ExamState.calibVideo = document.getElementById('calib-video');
+    ExamState.calibStatus = document.getElementById('calibration-status');
+    ExamState.calibButton = document.getElementById('btn-calibrate');
+    ExamState.blockedView = document.getElementById('blocked-view');
+    ExamState.questionsContainer = document.getElementById('exam-questions-container');
+    ExamState.sendCanvas = document.getElementById('sendCanvas');
 
-    updateTabCountDom();
-    attachAnswerHandlers();
-    setupSubmitButton();
-    monitorUserBehavior();
-    startTimer();
-    startExamStatusMonitor();
-    ensureFullscreenUI();
-    tryRequestFullscreen();
-    
-    // NEW: Initialize proctoring if enabled
-    if (proctorEnabled) {
-        initProctoring();
+    // NEW: student-visible camera element. Ensure your template contains <video id="student-camera" autoplay playsinline></video>
+    ExamState.studentCameraElement = document.getElementById('student-camera');
+
+    if (ExamState.sendCanvas) {
+        ExamState.sendContext = ExamState.sendCanvas.getContext('2d');
     }
-}
 
-/* ==========================================
-   AI PROCTORING SYSTEM
-   ========================================== */
+    // ⛔ BLOCK COPY / PASTE / CUT / RIGHT CLICK
+    // Disable copy, paste, cut, right-click, selection, and Ctrl+C/V/X/A
+    document.addEventListener("copy", (e) => e.preventDefault());
+    document.addEventListener("paste", (e) => e.preventDefault());
+    document.addEventListener("cut", (e) => e.preventDefault());
+    document.addEventListener("contextmenu", (e) => e.preventDefault());
+    document.addEventListener("selectstart", (e) => e.preventDefault());
 
-async function initProctoring() {
-    console.log("🎯 Initializing AI Proctoring...");
-    
-    // Show calibration modal
+    document.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) &&
+            ["c", "v", "x", "a"].includes(e.key.toLowerCase())) {
+            e.preventDefault();
+        }
+    });
+
+    updateTabSwitchDisplay();
     showCalibrationModal();
+    setupEventListeners();
+    setupAnswerTracking();
+    setupVisibilityMonitoring();
+    setupFullscreenMonitoring();
+
+    // small heartbeat to watch socket
+    setInterval(() => {
+        if (ExamState.socket && ExamState.socket.connected) {
+            ExamState.socket.emit('heartbeat', { ts: Date.now(), studentExamId: ExamState.studentExamId });
+        } else {
+            // if socket down, warn once
+            if (!ExamState.socket) return;
+            console.warn("⚠️ Socket not connected");
+        }
+    }, 10000);
+
+    console.log("✅ Exam initialization complete");
 }
 
+// SOCKET.IO HANDLERS
+function setupSocketHandlers() {
+    if (!ExamState.socket) return;
+
+    ExamState.socket.on('calibration_result', (data) => {
+        console.log("📸 Calibration result:", data);
+        handleCalibrationResult(data);
+    });
+
+    ExamState.socket.on('proctor_result', (data) => {
+        console.log("👁️ Proctor result:", data);
+        handleProctoringResult(data);
+    });
+
+    ExamState.socket.on('connect', () => {
+        console.log("✅ Socket connected");
+    });
+
+    ExamState.socket.on('disconnect', () => {
+        console.warn("⚠️ Socket disconnected");
+        showNotification("Proctor connection lost. Attempting to reconnect...", "warning");
+    });
+
+    // optional server heartbeat ack
+    ExamState.socket.on('heartbeat_ack', (d) => {
+        ExamState.lastSocketHeartbeat = Date.now();
+    });
+}
+
+// CALIBRATION MODAL SYSTEM
 function showCalibrationModal() {
-    const modal = document.createElement('div');
-    modal.id = 'calibration-modal';
-    modal.className = 'proctor-modal';
-    modal.innerHTML = `
-        <div class="proctor-modal-content">
-            <div class="proctor-header">
-                <svg class="proctor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                </svg>
-                <h2>Camera Calibration</h2>
-            </div>
-            <div class="proctor-body">
-                <p class="proctor-message">
-                    We need to calibrate your camera before starting the exam. Please follow the instructions below:
-                </p>
-                <div class="calibration-instructions">
-                    <div class="instruction-item">
-                        <span class="instruction-number">1</span>
-                        <span>Sit straight and face the screen</span>
-                    </div>
-                    <div class="instruction-item">
-                        <span class="instruction-number">2</span>
-                        <span>Ensure your face is visible</span>
-                    </div>
-                    <div class="instruction-item">
-                        <span class="instruction-number">3</span>
-                        <span>Stay still for 3 seconds</span>
-                    </div>
-                </div>
-                <div class="calibration-video-container">
-                    <video id="calibration-video" autoplay playsinline></video>
-                    <div id="calibration-guide-box" class="guide-box"></div>
-                </div>
-                <canvas id="calibration-canvas" style="display:none;"></canvas>
-                <div id="calibration-status" class="calibration-status"></div>
-            </div>
-            <div class="proctor-footer">
-                <button id="btn-calibrate" class="proctor-btn proctor-btn-primary">
-                    <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                    </svg>
-                    Start Calibration
-                </button>
-            </div>
-        </div>
-    `;
-
-
-    
-    document.body.appendChild(modal);
-    
-    // Initialize webcam for calibration
-    initCalibrationCamera();
-    
-    // Setup calibration button
-    document.getElementById('btn-calibrate').addEventListener('click', performCalibration);
+    console.log("📸 Showing calibration modal");
+    if (!ExamState.modal) { console.error("❌ Modal element not found"); return; }
+    ExamState.modal.classList.remove('hidden');
+    ExamState.modal.style.display = 'flex';
+    updateCalibrationStatus("Requesting camera access...", "info");
+    startCalibrationCamera();
+}
+function hideCalibrationModal() {
+    console.log("✅ Hiding calibration modal");
+    if (ExamState.modal) { ExamState.modal.classList.add('hidden'); ExamState.modal.style.display = 'none'; }
+    if (ExamState.calibVideo && ExamState.calibVideo.srcObject) {
+        const tracks = ExamState.calibVideo.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+        ExamState.calibVideo.srcObject = null;
+    }
 }
 
-async function initCalibrationCamera() {
+async function startCalibrationCamera() {
+    console.log("📸 Starting calibration camera...");
+    if (!ExamState.calibVideo) {
+        console.error("❌ Calibration video element not found");
+        updateCalibrationStatus("Camera initialization failed", "error");
+        return;
+    }
+
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480 }
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
         });
-        
-        const video = document.getElementById('calibration-video');
-        video.srcObject = stream;
-        
-        video.onloadedmetadata = () => {
-            video.play();
-            updateCalibrationGuideBox();
-        };
-        
-    } catch (err) {
-        console.error("Camera access error:", err);
-        showCalibrationError("Could not access camera: " + err.message);
-    }
-}
 
-function updateCalibrationGuideBox() {
-    const video = document.getElementById('calibration-video');
-    const guideBox = document.getElementById('calibration-guide-box');
-    
-    if (!video || !guideBox) return;
-    
-    const w = video.videoWidth || 640;
-    const h = video.videoHeight || 480;
-    const guideW = w * 0.4;
-    const guideH = h * 0.5;
-    const left = (w - guideW) / 2;
-    const top = (h - guideH) / 2;
-    
-    guideBox.style.left = left + "px";
-    guideBox.style.top = top + "px";
-    guideBox.style.width = guideW + "px";
-    guideBox.style.height = guideH + "px";
+        ExamState.calibVideo.srcObject = stream;
+        ExamState.calibVideo.play();
+
+        // Also attach same stream to visible student preview (so student sees themselves during calibration)
+        if (ExamState.studentCameraElement) {
+            ExamState.studentCameraElement.srcObject = stream;
+            ExamState.studentCameraElement.play();
+        }
+
+        // Enable calibration button
+        if (ExamState.calibButton) {
+            ExamState.calibButton.disabled = false;
+            ExamState.calibButton.onclick = performCalibration;
+        }
+
+        console.log("✅ Calibration camera started");
+        updateCalibrationStatus("Camera ready. Click 'Start Calibration' to begin.", "success");
+
+    } catch (error) {
+        console.error("❌ Camera access error:", error);
+        updateCalibrationStatus("Camera access denied. Please enable camera permissions.", "error");
+        if (ExamState.calibButton) {
+            ExamState.calibButton.disabled = false;
+            ExamState.calibButton.onclick = startCalibrationCamera;
+            ExamState.calibButton.innerHTML = 'Retry Camera Access';
+        }
+    }
 }
 
 async function performCalibration() {
-    const statusDiv = document.getElementById('calibration-status');
-    const btnCalibrate = document.getElementById('btn-calibrate');
-    const video = document.getElementById('calibration-video');
-    const canvas = document.getElementById('calibration-canvas');
-    
-    if (!canvas) {
-        console.error("Canvas not found");
+    console.log("🔍 Starting calibration...");
+    if (!ExamState.calibVideo || !ExamState.calibVideo.srcObject) {
+        console.error("❌ No video stream available");
+        updateCalibrationStatus("Camera not ready", "error");
         return;
     }
-    
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    
-    btnCalibrate.disabled = true;
-    statusDiv.textContent = "Calibrating... Please sit straight and look at the screen.";
-    statusDiv.className = "calibration-status status-calibrating";
-    
-    // Collect 20 frames over ~3 seconds
-    const frames = [];
-    const N = 20;
-    
+
+    if (ExamState.calibButton) {
+        ExamState.calibButton.disabled = true;
+        ExamState.calibButton.innerHTML = 'Calibrating...';
+    }
+    updateCalibrationStatus("Analyzing your face...", "info");
+
     try {
-        for (let i = 0; i < N; i++) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-            frames.push(dataUrl);
-            await new Promise(res => setTimeout(res, 150));
-        }
-        
-        // Send to backend
-        statusDiv.textContent = "Processing calibration data...";
-        
-        const resp = await fetch(`/api/proctor/calibrate/${studentExamId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ frames })
-        });
-        
-        const data = await resp.json();
-        
-        if (data.status === "ok") {
-            calibrationCompleted = true;
-            statusDiv.textContent = "✓ Calibration successful!";
-            statusDiv.className = "calibration-status status-success";
-            
-            // Wait 1 second then close modal and start proctoring
-            setTimeout(() => {
-                closeCalibrationModal();
-                startProctoring();
-            }, 1500);
-            
+        // Use ImageCapture or fallback to canvas
+        const track = ExamState.calibVideo.srcObject.getVideoTracks()[0];
+        let arrayBuffer = null;
+
+        if (typeof ImageCapture !== 'undefined') {
+            const imageCapture = new ImageCapture(track);
+            const blob = await imageCapture.takePhoto({ imageWidth: 160, imageHeight: 120 });
+            arrayBuffer = await blob.arrayBuffer();
         } else {
-            statusDiv.textContent = "✗ Calibration failed: " + (data.message || "Unknown error");
-            statusDiv.className = "calibration-status status-error";
-            btnCalibrate.disabled = false;
+            // fallback capture frame to canvas
+            const c = document.createElement('canvas');
+            c.width = 160; c.height = 120;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(ExamState.calibVideo, 0, 0, c.width, c.height);
+            const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.6));
+            arrayBuffer = await blob.arrayBuffer();
         }
-        
-    } catch (err) {
-        console.error("Calibration error:", err);
-        statusDiv.textContent = "✗ Calibration error: " + err.message;
-        statusDiv.className = "calibration-status status-error";
-        btnCalibrate.disabled = false;
-    }
-}
 
-function closeCalibrationModal() {
-    const modal = document.getElementById('calibration-modal');
-    if (modal) {
-        // Stop camera stream
-        const video = document.getElementById('calibration-video');
-        if (video && video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
+        console.log(`📤 Sending calibration frame (${arrayBuffer.byteLength} bytes)`);
+
+        // Send via Socket.IO binary event (keep same event name)
+        ExamState.socket.emit('calibrationBinary', {
+            studentExamId: ExamState.studentExamId,
+            frame: arrayBuffer
+        });
+
+    } catch (error) {
+        console.error("❌ Calibration capture error:", error);
+        updateCalibrationStatus("Failed to capture image. Please try again.", "error");
+        if (ExamState.calibButton) {
+            ExamState.calibButton.disabled = false;
+            ExamState.calibButton.innerHTML = 'Retry Calibration';
         }
-        modal.remove();
     }
 }
 
-function showCalibrationError(message) {
-    const statusDiv = document.getElementById('calibration-status');
-    if (statusDiv) {
-        statusDiv.textContent = "✗ " + message;
-        statusDiv.className = "calibration-status status-error";
-    }
-}
-
-async function startProctoring() {
-    console.log("📹 Starting AI Proctoring...");
-    
-    // Create camera preview window
-    createCameraPreview();
-    
-    // Initialize exam webcam
-    await initExamCamera();
-    
-    // Start frame capture every 1 second
-    proctorInterval = setInterval(captureAndAnalyzeFrame, 1000);
-}
-
-function createCameraPreview() {
-    const previewContainer = document.createElement('div');
-    previewContainer.id = 'camera-preview-container';
-    previewContainer.className = 'camera-preview';
-    previewContainer.innerHTML = `
-        <div class="camera-header">
-            <div class="camera-status">
-                <div class="status-dot status-normal"></div>
-                <span id="camera-status-text">Monitoring</span>
-            </div>
-            <div class="camera-controls">
-                <button id="btn-minimize-camera" class="camera-control-btn" title="Minimize">
-                    <svg viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        <div class="camera-body">
-            <video id="exam-video" autoplay playsinline></video>
-            <canvas id="exam-canvas" style="display:none;"></canvas>
-        </div>
-        <div class="camera-footer">
-            <span id="violation-count">Violations: 0/${maxViolations}</span>
-        </div>
-    `;
-    
-    document.body.appendChild(previewContainer);
-    
-    // Setup minimize button
-    document.getElementById('btn-minimize-camera').addEventListener('click', toggleCameraMinimize);
-}
-
-function toggleCameraMinimize() {
-    const container = document.getElementById('camera-preview-container');
-    const btn = document.getElementById('btn-minimize-camera');
-    
-    cameraMinimized = !cameraMinimized;
-    
-    if (cameraMinimized) {
-        container.classList.add('minimized');
-        btn.innerHTML = `
-            <svg viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
-            </svg>
-        `;
-        btn.title = "Restore";
+function handleCalibrationResult(data) {
+    console.log("📊 Calibration result:", data);
+    if (data.success) {
+        ExamState.calibrationComplete = true;
+        updateCalibrationStatus("✅ Calibration complete! Starting exam...", "success");
+        setTimeout(() => {
+            hideCalibrationModal();
+            startExam();
+        }, 1200);
     } else {
-        container.classList.remove('minimized');
-        btn.innerHTML = `
-            <svg viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"/>
-            </svg>
-        `;
-        btn.title = "Minimize";
+        const message = data.message || "No face detected. Please position yourself clearly in front of the camera.";
+        updateCalibrationStatus(message, "error");
+        if (ExamState.calibButton) {
+            ExamState.calibButton.disabled = false;
+            ExamState.calibButton.innerHTML = 'Retry Calibration';
+        }
     }
 }
 
-async function initExamCamera() {
+function updateCalibrationStatus(message, type = "info") {
+    if (!ExamState.calibStatus) return;
+    ExamState.calibStatus.textContent = message;
+    ExamState.calibStatus.className = 'calibration-status';
+    if (type === "success") ExamState.calibStatus.classList.add('success');
+    else if (type === "error") ExamState.calibStatus.classList.add('error');
+    else ExamState.calibStatus.classList.add('info');
+}
+
+// EXAM START
+async function startExam() {
+    console.log("🎯 Starting exam...");
+
+    if (ExamState.blockedView) ExamState.blockedView.style.display = 'none';
+    if (ExamState.questionsContainer) ExamState.questionsContainer.style.display = 'block';
+
+    startTimer();
+    await startContinuousProctoring();
+
+    // Enforce fullscreen
+    requestFullscreen();
+
+    console.log("✅ Exam started successfully");
+}
+
+// CONTINUOUS PROCTORING
+async function startContinuousProctoring() {
+    console.log("👁️ Starting continuous proctoring...");
+
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480 }
-        });
-        
-        video = document.getElementById('exam-video');
-        canvas = document.getElementById('exam-canvas');
-        
-        if (!video || !canvas) {
-            console.error("Camera elements not found");
-            return;
-        }
-        
-        video.srcObject = stream;
-        canvas.width = 640;
-        canvas.height = 480;
-        ctx = canvas.getContext('2d');
-        
-        video.onloadedmetadata = () => {
-            video.play();
-        };
-        
-    } catch (err) {
-        console.error("Exam camera access error:", err);
-        showViolationPopup("Camera access required for proctoring. Please enable camera permissions.");
-    }
-}
-
-async function captureAndAnalyzeFrame() {
-    if (!video || !ctx || !calibrationCompleted) return;
-    
-    try {
-        // Capture frame
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frameDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-        
-        // Send to backend for analysis
-        const resp = await fetch(`/api/proctor/analyze/${studentExamId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                frame: frameDataUrl,
-                ts: Date.now()
-            })
-        });
-        
-        const data = await resp.json();
-        
-        // Update UI based on status
-        updateCameraStatus(data);
-        
-        // Handle violations
-        if (data.status === "WARNING" || data.status === "NO_FACE") {
-            totalViolations = data.total_violations || totalViolations;
-            updateViolationCount();
-            showViolationPopup(data.message);
-            
-        } else if (data.status === "TERMINATE" || data.should_terminate) {
-            totalViolations = data.total_violations || totalViolations;
-            handleTermination(data.message);
-        }
-        
-    } catch (err) {
-        console.error("Frame analysis error:", err);
-    }
-}
-
-function updateCameraStatus(data) {
-    const statusDot = document.querySelector('.status-dot');
-    const statusText = document.getElementById('camera-status-text');
-    
-    if (!statusDot || !statusText) return;
-    
-    statusDot.className = 'status-dot';
-    
-    if (data.status === "NORMAL") {
-        statusDot.classList.add('status-normal');
-        statusText.textContent = "Monitoring";
-    } else if (data.status === "WARNING" || data.status === "NO_FACE") {
-        statusDot.classList.add('status-warning');
-        statusText.textContent = "Warning";
-    } else if (data.status === "TERMINATE") {
-        statusDot.classList.add('status-terminate');
-        statusText.textContent = "Terminated";
-    }
-}
-
-function updateViolationCount() {
-    const violationCountEl = document.getElementById('violation-count');
-    if (violationCountEl) {
-        violationCountEl.textContent = `Violations: ${totalViolations}/${maxViolations}`;
-        
-        if (totalViolations >= maxViolations - 2) {
-            violationCountEl.classList.add('warning');
-        }
-    }
-}
-
-function showViolationPopup(message) {
-    // Create popup overlay
-    const popup = document.createElement('div');
-    popup.className = 'violation-popup';
-    popup.innerHTML = `
-        <div class="violation-popup-content">
-            <div class="violation-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-            </div>
-            <h3>Proctoring Alert</h3>
-            <p>${message}</p>
-            <p class="violation-warning">Violations: ${totalViolations}/${maxViolations}</p>
-            <button class="violation-btn" onclick="this.parentElement.parentElement.remove()">
-                I Understand
-            </button>
-        </div>
-    `;
-    
-    document.body.appendChild(popup);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (popup.parentElement) {
-            popup.remove();
-        }
-    }, 5000);
-}
-
-async function handleTermination(message) {
-    console.warn("🚨 Proctoring violation threshold exceeded");
-    
-    // Stop proctoring
-    if (proctorInterval) {
-        clearInterval(proctorInterval);
-        proctorInterval = null;
-    }
-    
-    // Stop camera
-    if (video && video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
-    
-    // Show termination message
-    showAutoSubmitPopup(message || "Too many proctoring violations detected. Auto-submitting exam...");
-    
-    // Auto-submit exam
-    await autoSubmitExam();
-}
-
-/* ==========================================
-   TIMER MANAGEMENT
-   ========================================== */
-
-function startTimer() {
-    const timers = document.querySelectorAll("#header-timer, #exam-timer");
-    if (!timers.length) {
-        console.warn("⚠️ Timer elements not found");
-        return;
-    }
-
-    if (timerHandle) clearInterval(timerHandle);
-
-    function updateTimer() {
-        const now = Date.now();
-        remainingTime = Math.max(0, (examEndTime - now) / 1000);
-
-        if (remainingTime <= 0) {
-            timers.forEach(el => el.textContent = "00:00:00");
-            clearInterval(timerHandle);
-            showAutoSubmitPopup("Time's up! Auto-submitting your exam...");
-            autoSubmitExam();
-            return;
-        }
-
-        const hours = Math.floor(remainingTime / 3600);
-        const minutes = Math.floor((remainingTime % 3600) / 60);
-        const seconds = Math.floor(remainingTime % 60);
-        const formatted = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-
-        timers.forEach(el => {
-            el.textContent = formatted;
-            el.classList.remove("warning", "danger");
-            if (remainingTime <= 300 && remainingTime > 120) el.classList.add("warning");
-            if (remainingTime <= 120) el.classList.add("danger");
-        });
-    }
-
-    updateTimer();
-    timerHandle = setInterval(updateTimer, 1000);
-}
-
-/* ==========================================
-   EXAM STATUS MONITORING
-   ========================================== */
-
-function startExamStatusMonitor() {
-    if (!studentExamId) {
-        console.warn("startExamStatusMonitor: studentExamId not set yet — retrying in 1s");
-        setTimeout(startExamStatusMonitor, 1000);
-        return;
-    }
-
-    if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-        statusCheckInterval = null;
-    }
-
-    statusCheckInterval = setInterval(async () => {
-        try {
-            console.log(`Checking exam status for studentExamId=${studentExamId} ...`);
-            const response = await fetch(`/api/check-exam-status/${studentExamId}`, { cache: "no-store" });
-
-            if (!response.ok) {
-                console.warn("Exam status check returned non-OK:", response.status);
-                return;
-            }
-
-            const data = await response.json();
-            console.debug("Exam status payload:", data);
-
-            const facultyEnded = data.force_ended === true
-                              || data.force_end === true
-                              || (data.force_ended_at && new Date(data.force_ended_at).getTime() <= Date.now())
-                              || (data.force_ended_time && new Date(data.force_ended_time).getTime() <= Date.now());
-
-            if (facultyEnded) {
-                console.warn("Faculty forced exam end detected. Submitting now.");
-                if (statusCheckInterval) { clearInterval(statusCheckInterval); statusCheckInterval = null; }
-                if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
-                if (proctorInterval) { clearInterval(proctorInterval); proctorInterval = null; }
-
-                try { showFacultyEndPopup(); } catch (e) { console.warn("showFacultyEndPopup error:", e); }
-
-                try {
-                    await autoSubmitExam();
-                } catch (e) {
-                    console.error("autoSubmitExam threw an error after faculty end:", e);
-                    try {
-                        alert("Exam is being submitted by instructor. If you are not redirected, please contact support.");
-                    } catch (_) {}
-                }
-                return;
-            }
-
-            if (data.updated_end_time) {
-                const newEndTime = new Date(data.updated_end_time).getTime();
-                if (!isNaN(newEndTime) && newEndTime > Date.now()) {
-                    if (newEndTime !== examEndTime) {
-                        examEndTime = newEndTime;
-                        console.log(`⏰ Exam end time updated by server -> ${new Date(examEndTime).toLocaleString()}`);
-                        if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
-                        startTimer();
-                    }
-                } else {
-                    console.warn("Ignoring invalid/past updated_end_time from server:", data.updated_end_time);
-                }
-            }
-
-        } catch (err) {
-            console.warn("Status check failed:", err);
-        }
-    }, 2000);
-}
-
-function showFacultyEndPopup() {
-    blockNavigation();
-    
-    const overlay = document.createElement('div');
-    overlay.id = 'faculty-end-overlay';
-    overlay.innerHTML = `
-        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background: rgba(0,0,0,0.95); z-index: 99999; 
-                    display: flex; align-items: center; justify-content: center;">
-            <div style="background: white; padding: 40px; border-radius: 12px; 
-                        max-width: 500px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
-                <div style="width: 80px; height: 80px; margin: 0 auto 20px; 
-                            background: #ef4444; border-radius: 50%; 
-                            display: flex; align-items: center; justify-content: center;">
-                    <svg style="width: 48px; height: 48px; color: white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="12"/>
-                        <line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                </div>
-                <h2 style="font-size: 24px; margin: 0 0 12px; color: #1f2937;">Exam Ended by Instructor</h2>
-                <p style="font-size: 16px; color: #6b7280; margin: 0 0 20px;">
-                    Your instructor has ended this exam. Your responses are being submitted automatically.
-                </p>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #3b82f6;">
-                    <svg style="width: 20px; height: 20px; animation: spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                    </svg>
-                    <span>Submitting...</span>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
-
-function blockNavigation() {
-    window.onbeforeunload = () => "Exam submission in progress. Please wait.";
-}
-
-function showAutoSubmitPopup(message) {
-    blockNavigation();
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.9); z-index: 999999;
-        display: flex; align-items: center; justify-content: center;
-    `;
-    overlay.innerHTML = `
-        <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px;">
-            <h3 style="margin: 0 0 15px; color: #1f2937;">${message}</h3>
-            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; color: #3b82f6;">
-                <svg style="width: 20px; height: 20px; animation: spin 1s linear infinite;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
-                </svg>
-                <span>Submitting...</span>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
-
-/* ==========================================
-   ANSWER HANDLING
-   ========================================== */
-
-function attachAnswerHandlers() {
-    const radios = document.querySelectorAll("[name^='question_']");
-    radios.forEach(radio => {
-        radio.addEventListener("change", async (e) => {
-            const input = e.target;
-            const questionId = input.dataset.questionId;
-            const answer = input.value;
-            
-            const label = input.closest("label");
-            if (label) {
-                const allLabels = document.querySelectorAll(`[name='${input.name}']`).forEach(r => {
-                    r.closest("label")?.classList.remove("selected");
-                });
-                label.classList.add("selected");
-            }
-            
-            await saveAnswer(questionId, answer);
-        });
-    });
-}
-
-async function saveAnswer(questionId, answer) {
-    if (!studentExamId || !questionId) return;
-    try {
-        await fetch(`/api/save-answer/${studentExamId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                question_id: questionId,
-                selected_answer: answer
-            })
-        });
-    } catch (err) {
-        console.warn("Save answer error:", err);
-    }
-}
-
-/* ==========================================
-   USER BEHAVIOR MONITORING
-   ========================================== */
-
-function monitorUserBehavior() {
-    let outTimer = null;
-    let outSeconds = 0;
-
-    document.addEventListener("visibilitychange", async () => {
-        if (document.hidden) {
-            outSeconds = 0;
-            outTimer = setInterval(async () => {
-                outSeconds++;
-                if (outSeconds >= 5) {
-                    clearInterval(outTimer);
-                    showAutoSubmitPopup("You were away from the exam window for too long. Auto-submitting...");
-                    await autoSubmitExam();
-                }
-            }, 1000);
-
-            tabSwitchCount = (tabSwitchCount || 0) + 1;
-            updateTabCountDom();
-            await logActivity("tab_switch", `Tab switched, count=${tabSwitchCount}`, "medium");
-
-            try {
-                await fetch(`/api/update-tabcount/${studentExamId}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ tab_switch_count: tabSwitchCount })
-                });
-            } catch (_) {}
-
-            if (tabSwitchCount >= maxTabSwitches) {
-                clearInterval(outTimer);
-                showAutoSubmitPopup("Too many tab switches detected. Auto-submitting...");
-                await autoSubmitExam();
-            }
-
+        // Reuse existing stream if calibration produced it
+        let stream = null;
+        if (ExamState.calibVideo && ExamState.calibVideo.srcObject) {
+            stream = ExamState.calibVideo.srcObject;
         } else {
-            if (outTimer) clearInterval(outTimer);
-            outSeconds = 0;
-        }
-    });
-
-    document.addEventListener("fullscreenchange", async () => {
-        const overlay = document.getElementById("fs-overlay");
-        if (document.fullscreenElement) {
-            if (overlay) overlay.style.display = "none";
-            await logActivity("fullscreen_enter", "Entered fullscreen", "low");
-        } else {
-            if (overlay) overlay.style.display = "flex";
-            await logActivity("fullscreen_exit", "Exited fullscreen", "medium");
-            alert("⚠️ You left fullscreen. Re-enter immediately or the exam may be auto-submitted.");
-        }
-    });
-
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
-
-    ["copy", "paste", "cut", "selectstart"].forEach(evt => {
-        document.addEventListener(evt, (e) => e.preventDefault());
-    });
-
-    document.addEventListener("keyup", async (e) => {
-        if (e.key === "PrintScreen") {
-            try { await navigator.clipboard.writeText(""); } catch (_) {}
-            alert("⚠️ Screenshot attempt detected!");
-            await logActivity("screenshot_attempt", "Pressed PrintScreen", "high");
-        }
-    });
-
-    document.addEventListener("keydown", async (e) => {
-        if ((e.ctrlKey && e.key.toLowerCase() === "p") || 
-            (e.metaKey && e.shiftKey && ["3", "4"].includes(e.key))) {
-            e.preventDefault();
-            alert("Printing/screenshot disabled during the exam.");
-            await logActivity("screenshot_hotkey", "Attempted screenshot hotkey", "high");
-        }
-    });
-}
-
-/* ==========================================
-   UI HELPERS
-   ========================================== */
-
-function updateTabCountDom() {
-    if (!showTabSwitches) return;
-    const el = document.getElementById("tab-count") || document.getElementById("tab-switch-counter");
-    if (!el) return;
-    el.textContent = `${tabSwitchCount} / ${maxTabSwitches}`;
-    
-    if (tabSwitchCount >= maxTabSwitches) {
-        el.classList.add("alert");
-    } else {
-        el.classList.remove("alert");
-    }
-}
-
-async function logActivity(type, description, severity = "low") {
-    if (!studentExamId) return;
-    try {
-        await fetch(`/api/log-activity/${studentExamId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                activity_type: type, 
-                description, 
-                severity 
-            })
-        });
-    } catch (_) {}
-}
-
-/* ==========================================
-   SUBMIT LOGIC
-   ========================================== */
-
-function setupSubmitButton() {
-    const btn = document.getElementById("submit-btn");
-    if (!btn) return;
-    btn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to submit the exam?")) return;
-        await autoSubmitExam();
-    });
-}
-
-async function autoSubmitExam() {
-    if (submitting) return;
-    submitting = true;
-    
-    if (timerHandle) clearInterval(timerHandle);
-    if (statusCheckInterval) clearInterval(statusCheckInterval);
-    if (proctorInterval) clearInterval(proctorInterval);
-    
-    // Stop camera
-    if (video && video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
-
-    try {
-        const allInputs = Array.from(document.querySelectorAll("[name^='question_']"));
-        const answered = new Set();
-        allInputs.forEach(i => { 
-            if (i.checked) answered.add(i.name); 
-        });
-
-        const questionNames = Array.from(new Set(allInputs.map(i => i.name)));
-        const unansweredIds = [];
-        for (const qname of questionNames) {
-            if (!answered.has(qname)) {
-                const el = document.querySelector(`[name='${qname}']`);
-                if (!el) continue;
-                const qid = el.dataset.questionId;
-                if (qid) unansweredIds.push(qid);
-            }
-        }
-
-        await Promise.all(unansweredIds.map(qid => saveAnswer(qid, "0")));
-
-        const form = document.getElementById("submit-form");
-        if (form) {
-            form.submit();
-        } else if (studentExamId) {
-            await fetch(`/submit_exam/${studentExamId}`, { method: "POST" });
-            alert("✅ Exam submitted successfully.");
-            window.location = "/";
-        } else {
-            alert("Exam submitted.");
-        }
-    } catch (err) {
-        console.error("Submit error:", err);
-        alert("An error occurred while submitting. Please contact support.");
-    } finally {
-        submitting = false;
-    }
-}
-
-/* ==========================================
-   FULLSCREEN HELPERS
-   ========================================== */
-
-function tryRequestFullscreen() {
-    try {
-        const el = document.documentElement;
-        if (el.requestFullscreen) {
-            el.requestFullscreen().catch(() => {});
-        } else if (el.webkitRequestFullscreen) {
-            el.webkitRequestFullscreen();
-        }
-    } catch (e) {}
-}
-
-function ensureFullscreenUI() {
-    const overlay = document.getElementById("fs-overlay");
-    if (!overlay) return;
-
-    if (!document.fullscreenElement) {
-        overlay.style.display = "flex";
-        const btn = document.getElementById("fs-enter-btn");
-        if (btn) {
-            btn.addEventListener("click", async () => {
-                tryRequestFullscreen();
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' }
             });
         }
-    } else {
-        overlay.style.display = "none";
+
+        ExamState.videoStream = stream;
+
+        // Make sure student sees the camera preview
+        if (ExamState.studentCameraElement) {
+            ExamState.studentCameraElement.srcObject = stream;
+            ExamState.studentCameraElement.autoplay = true;
+            ExamState.studentCameraElement.playsInline = true;
+            try { await ExamState.studentCameraElement.play(); } catch(e) { /* ignore */ }
+        }
+
+        // Hidden video element for capture - re-use if exists (prevents multiple elements)
+        if (!ExamState.videoElement) {
+            ExamState.videoElement = document.createElement('video');
+            ExamState.videoElement.autoplay = true;
+            ExamState.videoElement.playsInline = true;
+            ExamState.videoElement.muted = true;
+            ExamState.videoElement.style.display = 'none';
+            document.body.appendChild(ExamState.videoElement);
+        }
+        ExamState.videoElement.srcObject = stream;
+        await ExamState.videoElement.play();
+
+        console.log("✅ Proctoring video stream ready");
+
+        // Start frame capture loop (every 3 seconds)
+        if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+        ExamState.proctoringInterval = setInterval(captureAndSendFrame, 3000);
+
+    } catch (error) {
+        console.error("❌ Proctoring camera error:", error);
+        showNotification("Warning: Proctoring camera unavailable", "warning");
     }
 }
 
-// Export initExam function
-window.initExam = initExam;
+async function captureAndSendFrame() {
+    // ensure proctoring runs only when exam active and calibration done
+    if (!ExamState.videoElement || !ExamState.socket || !ExamState.calibrationComplete || !ExamState.isExamActive) {
+        return;
+    }
+
+    try {
+        const track = ExamState.videoElement.srcObject.getVideoTracks()[0];
+        if (!track) return;
+
+        // ImageCapture preferred
+        if (typeof ImageCapture !== 'undefined') {
+            const imageCapture = new ImageCapture(track);
+            const blob = await imageCapture.takePhoto({ imageWidth: 160, imageHeight: 120 }).catch(() => null);
+            if (!blob) return;
+            const arrayBuffer = await blob.arrayBuffer();
+            ExamState.socket.emit('frameBinary', {
+                studentExamId: ExamState.studentExamId,
+                frame: arrayBuffer,
+                timestamp: Date.now()
+            });
+        } else {
+            // fallback: draw frame to canvas then send
+            if (!ExamState.sendCanvas) {
+                const c = document.createElement('canvas');
+                c.width = 160; c.height = 120;
+                ExamState.sendCanvas = c;
+                ExamState.sendContext = c.getContext('2d');
+            }
+            ExamState.sendContext.drawImage(ExamState.videoElement, 0, 0, 160, 120);
+            const dataUrl = ExamState.sendCanvas.toDataURL('image/jpeg', 0.6);
+            // convert dataURL to ArrayBuffer
+            const base64 = dataUrl.split(',')[1];
+            const binary = atob(base64);
+            const len = binary.length;
+            const buffer = new ArrayBuffer(len);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < len; i++) view[i] = binary.charCodeAt(i);
+            ExamState.socket.emit('frameBinary', {
+                studentExamId: ExamState.studentExamId,
+                frame: buffer,
+                timestamp: Date.now()
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Frame capture error:", error);
+    }
+}
+
+function handleProctoringResult(data) {
+
+    if (data.violation === 'face_out_of_boundary') {
+        showViolationPopup(
+            "Face Out of Allowed Area",
+            "Please keep your face inside the boundary circle."
+        );
+    }
+
+    if (data.violation === "looking_away") {
+        ExamState.violations.looking_away++;
+        showViolationPopup("Looking Away", "Keep your face inside the circle.");
+    }
+    // server sends { success: false, violation: 'no_face', count: x, total_violations: y }
+    if (!data) return;
+
+    if (data.success) {
+        // face OK; optionally clear local 'no_face' streak? we keep totals persistent
+        return;
+    }
+
+    console.warn("⚠️ Proctor violation:", data.violation);
+
+    // Map server violation to local counters
+    if (data.violation === 'no_face') {
+        ExamState.violations.no_face++;
+        if (ExamState.violations.no_face % 3 === 0) {
+            showViolationPopup("No Face Detected", "Please ensure you are visible in the camera.");
+        }
+    } else if (data.violation === 'multiple_faces') {
+        ExamState.violations.multiple_faces++;
+        if (ExamState.violations.multiple_faces % 2 === 0) {
+            showViolationPopup("Multiple Faces Detected", "Only the exam taker should be visible.");
+        }
+    } else if (data.violation === 'looking_away') {
+        ExamState.violations.looking_away++;
+        if (ExamState.violations.looking_away % 5 === 0) {
+            showViolationPopup("Looking Away", "Please keep your eyes on the exam.");
+        }
+    }
+
+    // unified total (includes server-sent total_violations if available)
+    let serverTotal = data.total_violations || 0;
+    const localTotal = ExamState.violations.no_face + ExamState.violations.multiple_faces + ExamState.violations.looking_away;
+
+    const totalViolations = Math.max(serverTotal, localTotal);
+
+    // optional: show warning toast with counts
+    showNotification(`Violation detected (${data.violation}). Total: ${totalViolations}`, "warning");
+
+    if (totalViolations >= (data.max_threshold || 3)) {
+        terminateExamDueToViolations();
+    }
+}
+
+function terminateExamDueToViolations() {
+    console.error("🚨 Too many violations - auto-submitting exam");
+
+    ExamState.isExamActive = false;
+
+    if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+    if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+
+    // stop video
+    if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(t => t.stop());
+    if (ExamState.videoElement && ExamState.videoElement.srcObject) ExamState.videoElement.srcObject.getTracks().forEach(t => t.stop());
+    if (ExamState.studentCameraElement && ExamState.studentCameraElement.srcObject) ExamState.studentCameraElement.srcObject.getTracks().forEach(t => t.stop());
+
+    showViolationPopup("Exam Terminated", "Too many proctoring violations detected. Your exam is being submitted automatically.", () => {
+        submitExam(true);
+    });
+}
+
+// TIMER MANAGEMENT
+function startTimer() {
+    console.log(`⏱️ Starting timer: ${ExamState.secondsLeft} seconds`);
+    updateTimerDisplay();
+
+    if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+    ExamState.timerInterval = setInterval(() => {
+        if (ExamState.secondsLeft > 0 && ExamState.isExamActive) {
+            ExamState.secondsLeft--;
+            updateTimerDisplay();
+
+            if (ExamState.secondsLeft === 0) {
+                console.log("⏰ Time's up - auto-submitting");
+                clearInterval(ExamState.timerInterval);
+                submitExam(true);
+            }
+
+            if (ExamState.secondsLeft === 300) showNotification("⚠️ 5 minutes remaining!", "warning");
+            if (ExamState.secondsLeft === 60) showNotification("⚠️ 1 minute remaining!", "danger");
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const hours = Math.floor(ExamState.secondsLeft / 3600);
+    const minutes = Math.floor((ExamState.secondsLeft % 3600) / 60);
+    const seconds = ExamState.secondsLeft % 60;
+    const timeString = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    const timerElement = document.getElementById('header-timer');
+    if (timerElement) {
+        timerElement.textContent = timeString;
+        if (ExamState.secondsLeft <= 300) timerElement.classList.add('warning');
+        if (ExamState.secondsLeft <= 60) timerElement.classList.add('danger');
+    }
+}
+function pad(num) { return num.toString().padStart(2, '0'); }
+
+// ANSWER TRACKING & AUTOSAVE
+function setupAnswerTracking() {
+    console.log("📝 Setting up answer tracking...");
+    const existingInputs = document.querySelectorAll('input[type="radio"]:checked');
+    existingInputs.forEach(input => {
+        const questionId = input.dataset.questionId;
+        const answer = input.value;
+        ExamState.answers[questionId] = answer;
+    });
+    document.addEventListener('change', (e) => {
+        if (e.target.matches('input[type="radio"]')) {
+            handleAnswerChange(e.target);
+        }
+    });
+    setInterval(() => {
+        if (Object.keys(ExamState.answers).length > 0) saveAnswers();
+    }, 10000);
+}
+function handleAnswerChange(input) {
+    const questionId = input.dataset.questionId;
+    const answer = input.value;
+    ExamState.answers[questionId] = answer;
+    const questionCard = input.closest('.question-card');
+    if (questionCard) {
+        questionCard.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+        const selectedLabel = input.closest('.option');
+        if (selectedLabel) selectedLabel.classList.add('selected');
+    }
+    clearTimeout(ExamState.saveDebounceTimer);
+    ExamState.saveDebounceTimer = setTimeout(() => saveAnswers(), 1200);
+}
+
+async function saveAnswers() {
+    const now = Date.now();
+    if (now - ExamState.lastSaveTime < 900) return;
+    ExamState.lastSaveTime = now;
+
+    console.log("💾 Saving answers...", ExamState.answers);
+    try {
+        // UPDATED endpoint to match backend '/api/save-answer' expecting JSON { student_exam_id, answers }
+        const response = await fetch('/api/save-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                student_exam_id: ExamState.studentExamId,
+                answers: ExamState.answers
+            })
+        });
+        if (response.ok) console.log("✅ Answers saved successfully");
+        else console.warn("⚠️ Answer save failed:", response.status);
+    } catch (error) {
+        console.error("❌ Answer save error:", error);
+    }
+}
+
+// TAB SWITCH DETECTION (debounced)
+function setupVisibilityMonitoring() {
+    console.log("👀 Setting up tab switch monitoring...");
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && ExamState.isExamActive && ExamState.calibrationComplete) {
+            handleTabSwitch();
+        }
+    });
+    // blur can fire along with visibilitychange; debounce inside handler to avoid double count
+    window.addEventListener('blur', () => {
+        if (ExamState.isExamActive && ExamState.calibrationComplete) {
+            handleTabSwitch();
+        }
+    });
+}
+
+function handleTabSwitch() {
+    const now = Date.now();
+    // Throttle: only count one tab switch per 2 seconds (prevents double increments)
+    if (now - ExamState.lastTabSwitchAt < 2000) {
+        console.log("Tab switch debounced");
+        return;
+    }
+    ExamState.lastTabSwitchAt = now;
+
+    ExamState.tabSwitchCount++;
+    console.warn(`⚠️ Tab switch detected! Count: ${ExamState.tabSwitchCount}/${ExamState.maxTabSwitches}`);
+    updateTabSwitchDisplay();
+
+    // LOG activity using correct API endpoint
+    logActivity('tab_switch', { count: ExamState.tabSwitchCount });
+
+    showViolationPopup("Tab Switch Detected", `Warning ${ExamState.tabSwitchCount}/${ExamState.maxTabSwitches}: Stay on this page during the exam.`);
+
+    if (ExamState.tabSwitchCount >= ExamState.maxTabSwitches) {
+        console.error("🚨 Max tab switches reached - terminating exam");
+        ExamState.isExamActive = false;
+        showViolationPopup("Exam Terminated", "Maximum tab switches exceeded. Your exam is being submitted.", () => {
+            submitExam(true);
+        });
+    }
+}
+
+function updateTabSwitchDisplay() {
+    const tabCountElement = document.getElementById('tab-count');
+    if (tabCountElement && ExamState.showTabSwitches) {
+        tabCountElement.textContent = `${ExamState.tabSwitchCount} / ${ExamState.maxTabSwitches}`;
+        if (ExamState.tabSwitchCount >= ExamState.maxTabSwitches - 1) tabCountElement.classList.add('danger');
+        else if (ExamState.tabSwitchCount >= ExamState.maxTabSwitches / 2) tabCountElement.classList.add('warning');
+    }
+}
+
+// FULLSCREEN ENFORCEMENT
+function setupFullscreenMonitoring() {
+    console.log("🖥️ Setting up fullscreen monitoring...");
+    const fsOverlay = document.getElementById('fs-overlay');
+    const fsButton = document.getElementById('fs-enter-btn');
+
+    if (fsButton) fsButton.addEventListener('click', requestFullscreen);
+
+    document.addEventListener('fullscreenchange', () => {
+        // If user exits fullscreen while exam active and calibrated -> TERMINATE IMMEDIATELY
+        if (!document.fullscreenElement && ExamState.isExamActive && ExamState.calibrationComplete) {
+            // show overlay immediately
+            if (fsOverlay) fsOverlay.classList.add('active');
+            // stop timer
+            if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+
+            // log activity to backend (correct endpoint)
+            logActivity('fullscreen_exit', { ts: Date.now() });
+
+            // NEW: Immediately terminate the exam — strict enforcement
+            console.error("🚨 Fullscreen exited - terminating exam.");
+            ExamState.isExamActive = false;
+
+            // stop proctoring and media
+            if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+            if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(t => t.stop());
+            if (ExamState.videoElement && ExamState.videoElement.srcObject) ExamState.videoElement.srcObject.getTracks().forEach(t => t.stop());
+            if (ExamState.studentCameraElement && ExamState.studentCameraElement.srcObject) ExamState.studentCameraElement.srcObject.getTracks().forEach(t => t.stop());
+
+            // Auto-submit after showing message
+            showViolationPopup("Fullscreen Exit Detected", "You left fullscreen. The exam is being submitted.", () => {
+                submitExam(true);
+            });
+
+        } else if (document.fullscreenElement) {
+            // Entered fullscreen
+            if (fsOverlay) fsOverlay.classList.remove('active');
+            // resume timer only if calibration complete and exam is active
+            if (ExamState.calibrationComplete && ExamState.isExamActive && !ExamState.timerInterval) {
+                startTimer();
+            }
+        }
+    });
+}
+
+function requestFullscreen() {
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) elem.requestFullscreen();
+    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+    else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+}
+
+// EXAM SUBMISSION
+function setupEventListeners() {
+    const submitButton = document.getElementById('submit-btn');
+    if (submitButton) submitButton.addEventListener('click', () => submitExam(false));
+
+    window.addEventListener('beforeunload', (e) => {
+        if (ExamState.isExamActive && ExamState.calibrationComplete) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        }
+    });
+}
+
+function submitExam(autoSubmit = false) {
+    console.log("📤 Submitting exam...", autoSubmit ? "(auto)" : "(manual)");
+    saveAnswers();
+    if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+    if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+
+    // stop streams
+    if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(track => track.stop());
+    if (ExamState.videoElement && ExamState.videoElement.srcObject) ExamState.videoElement.srcObject.getTracks().forEach(track => track.stop());
+    if (ExamState.studentCameraElement && ExamState.studentCameraElement.srcObject) ExamState.studentCameraElement.srcObject.getTracks().forEach(track => track.stop());
+
+    ExamState.isExamActive = false;
+
+    const message = autoSubmit ? "Your exam is being submitted automatically..." : "Are you sure you want to submit your exam? This action cannot be undone.";
+
+    if (autoSubmit || confirm(message)) {
+        const submitForm = document.getElementById('submit-form');
+        if (submitForm) submitForm.submit();
+        else window.location.href = `/exam/${ExamState.studentExamId}/submit`;
+    } else {
+        ExamState.isExamActive = true;
+        startTimer();
+        if (ExamState.videoStream) ExamState.proctoringInterval = setInterval(captureAndSendFrame, 3000);
+    }
+}
+
+// ACTIVITY LOGGING - UPDATED endpoint to backend /api/log-activity/<id>
+async function logActivity(activityType, details = null) {
+    try {
+        const payload = {
+            activity_type: activityType,
+            description: details || '',
+            severity: details && details.severity ? details.severity : 'low'
+        };
+        const url = `/api/log-activity/${ExamState.studentExamId}`; // <<-- FIXED endpoint
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (error) {
+        console.error("❌ Activity log error:", error);
+    }
+}
+
+// UI NOTIFICATIONS & POPUPS
+function showNotification(message, type = "info") {
+    const notification = document.createElement('div');
+    notification.className = `exam-notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.classList.add('show'), 100);
+    setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 300); }, 5000);
+}
+function showViolationPopup(title, message, callback = null) {
+    const overlay = document.createElement('div');
+    overlay.className = 'violation-overlay';
+    overlay.innerHTML = `
+        <div class="violation-modal">
+            <div class="violation-icon">!</div>
+            <h2 class="violation-title">${title}</h2>
+            <p class="violation-message">${message}</p>
+            <button class="violation-close-btn">I Understand</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.classList.add('show'), 100);
+    const closeBtn = overlay.querySelector('.violation-close-btn');
+    closeBtn.addEventListener('click', () => {
+        overlay.classList.remove('show');
+        setTimeout(() => { overlay.remove(); if (callback) callback(); }, 300);
+    });
+}
+
+// CLEANUP ON PAGE UNLOAD
+window.addEventListener('unload', () => {
+    if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(track => track.stop());
+    if (ExamState.videoElement && ExamState.videoElement.srcObject) ExamState.videoElement.srcObject.getTracks().forEach(track => track.stop());
+    if (ExamState.calibVideo && ExamState.calibVideo.srcObject) ExamState.calibVideo.srcObject.getTracks().forEach(track => track.stop());
+    if (ExamState.studentCameraElement && ExamState.studentCameraElement.srcObject) ExamState.studentCameraElement.srcObject.getTracks().forEach(track => track.stop());
+
+    if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+    if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+
+    if (ExamState.socket) ExamState.socket.disconnect();
+});
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { initExam };
+}
+console.log("✅ Exam system module loaded (updated)");

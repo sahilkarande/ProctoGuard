@@ -1140,3 +1140,440 @@
     display: none !important;
 }
 /* proctored exam :end */
+
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* CALIBRATION MODAL STYLES */
+/* ═══════════════════════════════════════════════════════════════ */
+.student-camera-box {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+
+    /* Simple visible box */
+    width: 260px;
+    height: 200px;
+
+    background: #000;
+    border: 3px solid #6366f1;
+    border-radius: 10px;
+
+    z-index: 99999;   /* Always above everything */
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+#student-camera {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+
+.student-camera-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.student-camera-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 85%;
+    height: 85%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 3px dashed rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    z-index: 10000;
+}
+
+
+.calibration-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 90000;   /* BELOW student camera */
+    color: white;
+}
+
+.calibration-modal.hidden {
+    display: none;
+}
+
+.calibration-container {
+    background: white;
+    border-radius: 24px;
+    padding: 48px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: slideUp 0.4s ease-out;
+}
+
+.calibration-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.calibration-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.calibration-icon svg {
+    width: 40px;
+    height: 40px;
+    color: white;
+}
+
+.calibration-header h2 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 12px 0;
+}
+
+.calibration-header p {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+}
+
+.camera-preview {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.camera-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.camera-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    height: 80%;
+    border: 3px dashed rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.calibration-status {
+    text-align: center;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.calibration-status.info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.calibration-status.success {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.calibration-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.calibration-button {
+    width: 100%;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.calibration-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+}
+
+.calibration-button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.calibration-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.calibration-button .button-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* BLOCKED VIEW STYLES */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.blocked-view {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 1000;
+    padding: 48px;
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 600px;
+}
+
+.blocked-view-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.blocked-view-icon svg {
+    width: 40px;
+    height: 40px;
+    color: white;
+}
+
+.blocked-view h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 12px 0;
+}
+
+.blocked-view p {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* NOTIFICATION STYLES */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.exam-notification {
+    position: fixed;
+    top: 100px;
+    right: 24px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    transform: translateX(calc(100% + 24px));
+    transition: transform 0.3s ease;
+    font-weight: 500;
+    max-width: 400px;
+}
+
+.exam-notification.show {
+    transform: translateX(0);
+}
+
+.exam-notification.info {
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+
+.exam-notification.warning {
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+
+.exam-notification.danger {
+    border-left: 4px solid #ef4444;
+    color: #991b1b;
+}
+
+.exam-notification.success {
+    border-left: 4px solid #10b981;
+    color: #065f46;
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* VIOLATION MODAL STYLES */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.violation-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.violation-overlay.show {
+    opacity: 1;
+}
+
+.violation-modal {
+    background: white;
+    border-radius: 24px;
+    padding: 48px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.violation-overlay.show .violation-modal {
+    transform: scale(1);
+}
+
+.violation-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.violation-icon svg {
+    width: 40px;
+    height: 40px;
+    color: white;
+}
+
+.violation-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 12px 0;
+}
+
+.violation-message {
+    font-size: 16px;
+    color: #6b7280;
+    margin: 0 0 32px 0;
+    line-height: 1.6;
+}
+
+.violation-close-btn {
+    width: 100%;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.violation-close-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* ANIMATIONS */
+/* ═══════════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* QUESTIONS CONTAINER */
+/* ═══════════════════════════════════════════════════════════════ */
+
+#exam-questions-container {
+    display: none; /* Hidden until calibration complete */
+}
+
+#exam-questions-container.active {
+    display: block;
+}

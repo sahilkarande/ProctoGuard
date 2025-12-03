@@ -173,6 +173,11 @@ CREATE TABLE student_exam (
     total_violations INTEGER DEFAULT 0,
     proctoring_status TEXT DEFAULT 'active',
 
+    -- 🔥 NEW (required by your routes.py)
+    no_face_count INTEGER DEFAULT 0,
+    multiple_faces_count INTEGER DEFAULT 0,
+
+
     FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (exam_id) REFERENCES exam(id) ON DELETE CASCADE
 );

@@ -60,6 +60,18 @@ from backend.services.proctor_vision.openvino_vision import (
 )
 
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# SOCKET.IO FOR BINARY PROCTORING
+# ═══════════════════════════════════════════════════════════════════════
+from flask_socketio import SocketIO, emit
+
+# Initialize Socket.IO (will be bound to app in register_routes)
+socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
+
+print("✅ Socket.IO initialized for binary proctoring")
+
+
 admin_sql_bp = Blueprint('admin_sql', __name__)
 
 def is_authorized_sql_user():
@@ -159,6 +171,208 @@ def get_proctor_instance(student_exam_id: int, exam):
     return PROCTOR_INSTANCES[student_exam_id]
 
 
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# SOCKET.IO EVENT HANDLERS FOR BINARY PROCTORING
+# ═══════════════════════════════════════════════════════════════════════
+
+@socketio.on('calibrationBinary')
+def handle_calibration_binary(data):
+    """Handle binary calibration frame - FAST VERSION"""
+    try:
+        student_exam_id = data.get('studentExamId')
+        frame_buffer = data.get('frame')
+        
+        if not frame_buffer or not student_exam_id:
+            emit('calibration_result', {'success': False, 'message': 'Invalid data'})
+            return
+        
+        print(f"📸 Received calibration frame: {len(frame_buffer)} bytes")
+        
+        # Convert ArrayBuffer to numpy array
+        nparr = np.frombuffer(frame_buffer, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            emit('calibration_result', {'success': False, 'message': 'Failed to decode frame'})
+            return
+        
+        # Use face detection cascade
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        print(f"👤 Detected {len(faces)} face(s)")
+        
+        # Update StudentExam
+        student_exam = StudentExam.query.get(student_exam_id)
+        
+        if len(faces) == 0:
+            # No face detected
+            emit('calibration_result', {
+                'success': False,
+                'message': 'No face detected. Please position yourself clearly in front of the camera.'
+            })
+            
+        elif len(faces) > 1:
+            # Multiple faces
+            emit('calibration_result', {
+                'success': False,
+                'message': 'Multiple faces detected. Please ensure only you are visible.'
+            })
+            
+        else:
+            # Calibration successful
+            if student_exam:
+                student_exam.calibration_completed = True
+                student_exam.calibration_timestamp = datetime.utcnow()
+                db.session.commit()
+                print(f"✅ Calibration completed for StudentExam {student_exam_id}")
+            
+            emit('calibration_result', {
+                'success': True,
+                'message': 'Face calibrated successfully!'
+            })
+        
+    except Exception as e:
+        print(f"❌ Calibration error: {e}")
+        traceback.print_exc()
+        emit('calibration_result', {'success': False, 'message': 'Calibration failed. Please try again.'})
+
+
+@socketio.on('frameBinary')
+def handle_frame_binary(data):
+    """Handle binary proctoring frame - CONTINUOUS MONITORING"""
+    try:
+        student_exam_id = data.get('studentExamId')
+        frame_buffer = data.get('frame')
+        
+        if not frame_buffer or not student_exam_id:
+            return
+        
+        # Convert to numpy array
+        nparr = np.frombuffer(frame_buffer, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return
+        
+        # Detect faces
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        # Get StudentExam
+        student_exam = StudentExam.query.get(student_exam_id)
+        
+        if not student_exam:
+            return
+        
+        # Initialize violation counts if None
+        if student_exam.no_face_count is None:
+            student_exam.no_face_count = 0
+        if student_exam.multiple_faces_count is None:
+            student_exam.multiple_faces_count = 0
+        if student_exam.total_violations is None:
+            student_exam.total_violations = 0
+        
+        # Check for violations
+        if len(faces) == 0:
+            # No face detected
+            student_exam.no_face_count += 1
+            student_exam.total_violations += 1
+            
+            # Log violation
+            violation = ExamViolation(
+                student_exam_id=student_exam_id,
+                violation_type='no_face',
+                message='No face detected in frame',
+                severity='medium',
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(violation)
+            db.session.commit()
+            
+            emit('proctor_result', {
+                'success': False,
+                'violation': 'no_face',
+                'message': 'No face detected',
+                'count': student_exam.no_face_count,
+                'total_violations': student_exam.total_violations
+            })
+            
+        elif len(faces) > 1:
+            # Multiple faces
+            student_exam.multiple_faces_count += 1
+            student_exam.total_violations += 1
+            
+            # Log violation
+            violation = ExamViolation(
+                student_exam_id=student_exam_id,
+                violation_type='multiple_faces',
+                message=f'Multiple faces detected ({len(faces)} faces)',
+                severity='high',
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(violation)
+            db.session.commit()
+            
+            emit('proctor_result', {
+                'success': False,
+                'violation': 'multiple_faces',
+                'message': 'Multiple faces detected',
+                'count': student_exam.multiple_faces_count,
+                'total_violations': student_exam.total_violations
+            })
+            
+        else:
+            # Face detected - all good
+            emit('proctor_result', {
+                'success': True,
+                'faces': 1
+            })
+        
+        # Check if total violations exceed threshold (15)
+        if student_exam.total_violations >= 15 and student_exam.status == 'in_progress':
+            # Auto-terminate exam
+            student_exam.status = 'terminated'
+            student_exam.submitted_at = datetime.utcnow()
+            student_exam.proctoring_status = 'terminated'
+            
+            # Log termination
+            violation = ExamViolation(
+                student_exam_id=student_exam_id,
+                violation_type='auto_terminated',
+                message='Exam auto-terminated due to excessive violations',
+                severity='critical',
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(violation)
+            db.session.commit()
+            
+            print(f"🚨 Exam terminated for StudentExam {student_exam_id} due to violations")
+            
+            # Calculate score before termination
+            calculate_student_score(student_exam_id)
+        
+    except Exception as e:
+        print(f"❌ Frame processing error: {e}")
+        traceback.print_exc()
+
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    print("✅ Socket.IO client connected")
+    
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    print("⚠️ Socket.IO client disconnected")
+
+
 def calculate_student_score(student_exam_id):
     """Calculate and update the score for a completed student exam"""
     try:
@@ -241,6 +455,13 @@ def calculate_student_score(student_exam_id):
 
 def register_routes(app):
     """Register all routes with the Flask app"""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # INITIALIZE SOCKET.IO WITH APP
+    # ═══════════════════════════════════════════════════════════════════
+    socketio.init_app(app)
+    print("✅ Socket.IO bound to Flask app for binary proctoring")
+    
     print("📝 Registering enhanced routes...")
 
     # ============================================================
@@ -3429,6 +3650,11 @@ def register_routes(app):
             'role': current_user.role,
             'password_changed': current_user.password_changed
         })
+
+    @app.route('/exam/<int:exam_id>/log_activity', methods=['POST'])
+    def log_activity_fix(exam_id):
+        return jsonify({"success": True})
+
         
     @app.route('/faculty/change-student-password/<int:student_id>', methods=['POST'])
     @login_required
