@@ -1,44 +1,166 @@
 // ===============================================================
-// VIEW EXAM JS - Updated for LIST layout + 3-Column Modal
+// VIEW EXAM JS - FINAL COMPLETE VERSION
 // ===============================================================
 
+// -------------------------
 // Extend Time Modal
+// -------------------------
 function showExtendTimeModal() {
     document.getElementById("extendTimeModal").classList.add("active");
 }
-
 function hideExtendTimeModal() {
     document.getElementById("extendTimeModal").classList.remove("active");
 }
 
-// Auto-refresh page every 5 minutes
-setInterval(() => {
+setInterval(async () => {
     const p = new URLSearchParams(window.location.search);
-    if (!p.has("no_refresh")) location.reload();
-}, 300000);
+    if (p.has("no_refresh")) return;
+
+    const r = await fetch(window.location.href);
+    const html = await r.text();
+
+    // choose the part you want to update
+    const newDoc = new DOMParser().parseFromString(html, "text/html");
+    document.querySelector("#content").innerHTML =
+        newDoc.querySelector("#content").innerHTML;
+
+}, 1000);
+
+
 
 
 // ===============================================================
-// STUDENT SELECTION MODAL (3-COLUMN)
+// MAIN MODAL LOGIC (Access Modal + Student Selection Modal)
 // ===============================================================
 document.addEventListener("DOMContentLoaded", () => {
 
-    // ----------------------------------------------------
+    // -------------------------
     // ELEMENTS
-    // ----------------------------------------------------
-    const modal = document.getElementById("student-selection-modal");
-    const selectBtn = document.getElementById("select-students-btn");
-    const closeBtn = document.getElementById("modal-close-btn");
-    const cancelBtn = document.getElementById("modal-cancel-btn");
-    const saveBtn = document.getElementById("modal-save-btn");
+    // -------------------------
+    const accessModal = document.getElementById("exam-access-modal");
+    const accessOpenBtns = document.querySelectorAll(".open-access-modal");
+    const accessCloseBtns = document.querySelectorAll(".close-access-modal");
 
-    const batchFilter = document.getElementById("batch-filter");
+    const allowedInput = document.getElementById("allowed-students-input");
+
+    const previewBox = document.getElementById("selected-students-preview");
+    const previewCount = document.getElementById("selected-count");
+    const previewList = document.getElementById("selected-students-list");
+
+    const radioStopped = document.querySelector("input[value='stopped']");
+    const radioAll = document.querySelector("input[value='all']");
+    const radioSpecific = document.querySelector("input[value='specific']");
+    const studentSelectorButton = document.getElementById("open-student-selection");
+
+    // -------------------------
+    // ACCESS MODAL OPEN/CLOSE
+    // -------------------------
+    accessOpenBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            accessModal.classList.add("active");
+            updateSelectedPreview();
+        });
+    });
+
+    accessCloseBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            accessModal.classList.remove("active");
+        });
+    });
+
+    // Close on background click
+    accessModal.addEventListener("click", e => {
+        if (e.target === accessModal) {
+            accessModal.classList.remove("active");
+        }
+    });
+
+
+    // ===============================================================
+    // SELECTED STUDENTS PREVIEW (INSIDE ACCESS CONTROL MODAL)
+    // ===============================================================
+    function updateSelectedPreview() {
+        const ids = (allowedInput.value || "")
+            .split(",")
+            .map(x => x.trim())
+            .filter(x => x !== "");
+
+        if (ids.length === 0 || !radioSpecific.checked) {
+            previewBox.style.display = "none";
+            return;
+        }
+
+        previewBox.style.display = "block";
+        previewCount.textContent = ids.length;
+        previewList.innerHTML = "";
+
+        ids.forEach(id => {
+            const row = document.querySelector(`.student-row[data-student-id="${id}"]`);
+            if (!row) return;
+
+            const name = row.querySelector(".student-name")?.textContent || `ID ${id}`;
+            const roll = row.dataset.rollId || "N/A";
+
+            const li = document.createElement("li");
+            li.textContent = `${name} (Roll ${roll})`;
+            previewList.appendChild(li);
+        });
+    }
+
+
+    // ===============================================================
+    // ACCESS MODE LOGIC
+    // ===============================================================
+    function updateAccessMode() {
+        if (radioSpecific.checked) {
+            studentSelectorButton.style.display = "inline-block";
+            updateSelectedPreview();
+        } else {
+            studentSelectorButton.style.display = "none";
+            previewBox.style.display = "none";
+        }
+    }
+
+    [radioStopped, radioAll, radioSpecific].forEach(radio => {
+        if (radio) radio.addEventListener("change", updateAccessMode);
+    });
+
+    updateAccessMode(); // run on load
+
+
+    // ===============================================================
+    // STUDENT SELECTION MODAL (OPEN FROM ACCESS MODAL)
+    // ===============================================================
+    const studentModal = document.getElementById("student-selection-modal");
+    const studentModalClose = document.getElementById("modal-close-btn");
+    const studentModalCancel = document.getElementById("modal-cancel-btn");
+    const saveStudentsBtn = document.getElementById("modal-save-btn");
+
+    studentSelectorButton?.addEventListener("click", () => {
+        accessModal.classList.remove("active");
+        studentModal.classList.add("active");
+    });
+
+    function closeStudentModal() {
+        studentModal.classList.remove("active");
+    }
+
+    studentModalClose?.addEventListener("click", closeStudentModal);
+    studentModalCancel?.addEventListener("click", closeStudentModal);
+
+    studentModal.addEventListener("click", e => {
+        if (e.target === studentModal) closeStudentModal();
+    });
+
+
+    // ===============================================================
+    // STUDENT LIST LOGIC
+    // ===============================================================
     const studentSearch = document.getElementById("student-search");
+    const batchFilter = document.getElementById("batch-filter");
     const rangeInput = document.getElementById("range-input");
     const applyRangeBtn = document.getElementById("apply-range-btn");
     const clearRangeBtn = document.getElementById("clear-range-btn");
-
-    const studentList = document.querySelector(".student-list");
 
     const selectAllBtn = document.getElementById("select-all-btn");
     const deselectAllBtn = document.getElementById("deselect-all-btn");
@@ -47,270 +169,118 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const modalSelectedCount = document.getElementById("modal-selected-count");
 
-    const selectedDisplay = document.getElementById("selected-students-display");
-    const selectedList = document.getElementById("selected-students-list");
-    const selectedCount = document.getElementById("selected-count");
-    const allowedStudentsInput = document.getElementById("allowed-students-input");
-
-    const radioSpecific = document.getElementById("radio-specific");
-    const radioAll = document.getElementById("radio-all");
-    const radioStopped = document.getElementById("radio-stopped");
-
-
-    // ----------------------------------------------------
-    // ACCESS MODE LOGIC
-    // ----------------------------------------------------
-    function updateAccessMode() {
-        if (!radioSpecific) return;
-
-        if (radioSpecific.checked) {
-            selectBtn.disabled = false;
-            updateSelectedDisplay();
-        } else {
-            selectBtn.disabled = true;
-            selectedDisplay.style.display = "none";
-        }
-    }
-
-    [radioSpecific, radioAll, radioStopped].forEach(r => {
-        if (r) r.addEventListener("change", updateAccessMode);
-    });
-
-
-    // ----------------------------------------------------
-    // MODAL OPEN / CLOSE
-    // ----------------------------------------------------
-    function openModal() {
-        modal.classList.add("active");
-        batchFilter.value = "";
-        studentSearch.value = "";
-        rangeInput.value = "";
-
-        hideAllStudents(); // until batch is chosen
-        disableControls();
-        updateModalCount();
-    }
-
-    function closeModal() {
-        modal.classList.remove("active");
-    }
-
-    selectBtn?.addEventListener("click", openModal);
-    closeBtn?.addEventListener("click", closeModal);
-    cancelBtn?.addEventListener("click", closeModal);
-
-    modal.addEventListener("click", e => {
-        if (e.target === modal) closeModal();
-    });
-
-
-    // ----------------------------------------------------
-    // UTILITY HELPERS
-    // ----------------------------------------------------
-    function hideAllStudents() {
-        document.querySelectorAll(".student-row").forEach(row => {
-            row.style.display = "none";
-        });
-    }
-
-    function showRows(rows) {
-        rows.forEach(row => (row.style.display = "grid"));
-    }
-
-    function disableControls() {
-        [
-            studentSearch, rangeInput, applyRangeBtn, clearRangeBtn,
-            selectAllBtn, deselectAllBtn, selectEvensBtn, selectOddsBtn
-        ].forEach(el => {
-            el.disabled = true;
-            el.style.opacity = 0.5;
-        });
-    }
-
-    function enableControls() {
-        [
-            studentSearch, rangeInput, applyRangeBtn, clearRangeBtn,
-            selectAllBtn, deselectAllBtn, selectEvensBtn, selectOddsBtn
-        ].forEach(el => {
-            el.disabled = false;
-            el.style.opacity = 1;
-        });
-    }
-
-
-    // ----------------------------------------------------
-    // SELECTION FUNCTIONS
-    // ----------------------------------------------------
-    function getVisibleRows() {
-        return [...document.querySelectorAll(".student-row")]
-            .filter(row => row.style.display !== "none");
-    }
-
-    function getSelectedStudents() {
-        return [...document.querySelectorAll(".student-checkbox:checked")].map(cb => cb.value);
-    }
+    const rows = document.querySelectorAll(".student-row");
 
     function updateModalCount() {
-        modalSelectedCount.textContent = getSelectedStudents().length;
-    }
-
-    function updateSelectedDisplay() {
-        const selectedIDs = getSelectedStudents();
-        selectedCount.textContent = selectedIDs.length;
-
-        if (!radioSpecific || !radioSpecific.checked) {
-            selectedDisplay.style.display = "none";
-            return;
-        }
-
-        if (selectedIDs.length > 0) {
-            selectedDisplay.style.display = "block";
-            selectedList.innerHTML = "";
-            selectedIDs.forEach(id => {
-                const row = document.querySelector(`.student-row[data-student-id="${id}"]`);
-                if (!row) return;
-
-                const name = row.querySelector(".student-name")?.textContent || id;
-                const tag = document.createElement("span");
-                tag.className = "selected-tag";
-                tag.textContent = name;
-                selectedList.appendChild(tag);
-            });
-        } else {
-            selectedDisplay.style.display = "none";
-        }
+        const count = document.querySelectorAll(".student-checkbox:checked").length;
+        modalSelectedCount.textContent = count;
     }
 
 
-    // ----------------------------------------------------
-    // BATCH FILTER
-    // ----------------------------------------------------
+    // -------------------------
+    // Filter by batch
+    // -------------------------
     batchFilter.addEventListener("change", () => {
         const batch = batchFilter.value;
-        const rows = document.querySelectorAll(".student-row");
-
-        if (!batch) {
-            hideAllStudents();
-            disableControls();
-            updateModalCount();
-            return;
-        }
 
         rows.forEach(row => {
-            row.style.display = row.dataset.batch === batch ? "grid" : "none";
+            row.style.display = (batch && row.dataset.batch === batch) ? "grid" : "none";
         });
 
-        enableControls();
         updateModalCount();
     });
 
 
-    // ----------------------------------------------------
-    // SEARCH (Within selected batch)
-    // ----------------------------------------------------
+    // -------------------------
+    // Search within batch
+    // -------------------------
     studentSearch.addEventListener("input", () => {
-        const batch = batchFilter.value;
-        if (!batch) {
-            studentSearch.value = "";
-            return alert("Select a batch first!");
-        }
-
         const term = studentSearch.value.toLowerCase();
+        const batch = batchFilter.value;
 
-        document.querySelectorAll(".student-row").forEach(row => {
-            if (row.dataset.batch === batch) {
-                row.style.display = row.textContent.toLowerCase().includes(term)
-                    ? "grid"
-                    : "none";
-            } else {
-                row.style.display = "none";
-            }
+        rows.forEach(row => {
+            const match = row.textContent.toLowerCase().includes(term);
+            const validBatch = (!batch || row.dataset.batch === batch);
+
+            row.style.display = (match && validBatch) ? "grid" : "none";
         });
+
+        updateModalCount();
     });
 
 
-    // ----------------------------------------------------
-    // SELECT ALL / DESELECT ALL
-    // ----------------------------------------------------
+    // -------------------------
+    // SELECT ALL / NONE
+    // -------------------------
     selectAllBtn.addEventListener("click", () => {
-        getVisibleRows().forEach(row => row.querySelector(".student-checkbox").checked = true);
+        rows.forEach(row => {
+            if (row.style.display !== "none")
+                row.querySelector(".student-checkbox").checked = true;
+        });
         updateModalCount();
     });
 
     deselectAllBtn.addEventListener("click", () => {
-        getVisibleRows().forEach(row => row.querySelector(".student-checkbox").checked = false);
+        rows.forEach(row => {
+            if (row.style.display !== "none")
+                row.querySelector(".student-checkbox").checked = false;
+        });
         updateModalCount();
     });
 
 
-    // ----------------------------------------------------
-    // SELECT EVENS / ODDS
-    // ----------------------------------------------------
+    // -------------------------
+    // Evens / Odds
+    // -------------------------
     selectEvensBtn.addEventListener("click", () => {
-        const rows = getVisibleRows();
         rows.forEach(row => {
+            if (row.style.display === "none") return;
             const roll = parseInt(row.dataset.rollId);
-            if (!isNaN(roll) && roll % 2 === 0) {
-                row.querySelector(".student-checkbox").checked = true;
-            }
+            if (roll % 2 === 0) row.querySelector(".student-checkbox").checked = true;
         });
         updateModalCount();
     });
 
     selectOddsBtn.addEventListener("click", () => {
-        const rows = getVisibleRows();
         rows.forEach(row => {
+            if (row.style.display === "none") return;
             const roll = parseInt(row.dataset.rollId);
-            if (!isNaN(roll) && roll % 2 === 1) {
-                row.querySelector(".student-checkbox").checked = true;
-            }
+            if (roll % 2 === 1) row.querySelector(".student-checkbox").checked = true;
         });
         updateModalCount();
     });
 
 
-    // ----------------------------------------------------
-    // ROLL RANGE SELECTION
-    // ----------------------------------------------------
+    // -------------------------
+    // Roll Range Selection
+    // -------------------------
     function parseRange(str) {
         const out = new Set();
-        const parts = str.split(",").map(s => s.trim());
+        str.split(",").forEach(part => {
+            part = part.trim();
+            if (!part) return;
 
-        for (let part of parts) {
             if (part.includes("-")) {
                 let [start, end] = part.split("-").map(Number);
-                if (isNaN(start) || isNaN(end) || start > end)
-                    throw new Error(`Invalid range: ${part}`);
-
                 for (let i = start; i <= end; i++) out.add(i.toString());
             } else {
-                let n = Number(part);
-                if (isNaN(n)) throw new Error(`Invalid number: ${part}`);
-                out.add(n.toString());
+                out.add(Number(part).toString());
             }
-        }
+        });
         return [...out];
     }
 
     applyRangeBtn.addEventListener("click", () => {
         try {
-            const batch = batchFilter.value;
-            if (!batch) return alert("Select a batch first!");
-
-            const ids = parseRange(rangeInput.value.trim());
-            let count = 0;
-
-            getVisibleRows().forEach(row => {
-                if (ids.includes(row.dataset.rollId)) {
+            const ids = parseRange(rangeInput.value);
+            rows.forEach(row => {
+                if (row.style.display === "none") return;
+                if (ids.includes(row.dataset.rollId))
                     row.querySelector(".student-checkbox").checked = true;
-                    count++;
-                }
             });
-
             updateModalCount();
-            alert(`Selected ${count} students in range.`);
-        } catch (err) {
-            alert(err.message);
+        } catch (e) {
+            alert("Invalid range format!");
         }
     });
 
@@ -319,30 +289,35 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
 
-    // ----------------------------------------------------
-    // SAVE SELECTION
-    // ----------------------------------------------------
-    saveBtn.addEventListener("click", () => {
-        allowedStudentsInput.value = getSelectedStudents().join(",");
-        updateSelectedDisplay();
-        closeModal();
+    // ===============================================================
+    // SAVE SELECTED STUDENTS
+    // ===============================================================
+    saveStudentsBtn.addEventListener("click", () => {
+        const selected = [...document.querySelectorAll(".student-checkbox:checked")]
+            .map(cb => cb.value);
+
+        allowedInput.value = selected.join(",");
+
+        closeStudentModal();
+        accessModal.classList.add("active");
+
+        updateSelectedPreview();
     });
 
-    studentList.addEventListener("change", updateModalCount);
+    rows.forEach(row => {
+        row.querySelector(".student-checkbox").addEventListener("change", updateModalCount);
+    });
 
 
-    // ----------------------------------------------------
-    // INITIAL SETUP
-    // ----------------------------------------------------
-    hideAllStudents();
+    // Initial load
     updateAccessMode();
-    updateSelectedDisplay();
+    updateSelectedPreview();
+    updateModalCount();
 });
 
 
 // ----------------------------------------------------
-// Smooth Drawer Toggle
-// ----------------------------------------------------
+// Smooth Drawer Toggle (optional)
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".drawer-toggle").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -355,3 +330,110 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+
+// -------- Exam Details Modal ----------
+document.querySelectorAll(".open-details-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("exam-details-modal").classList.add("active");
+    });
+});
+document.querySelectorAll(".close-details-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("exam-details-modal").classList.remove("active");
+    });
+});
+
+// -------- Exam Access Modal ----------
+document.querySelectorAll(".open-access-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("exam-access-modal").classList.add("active");
+    });
+});
+document.querySelectorAll(".close-access-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("exam-access-modal").classList.remove("active");
+    });
+});
+
+// -------- Questions Modal ----------
+document.querySelectorAll(".open-questions-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("questions-modal").classList.add("active");
+    });
+});
+document.querySelectorAll(".close-questions-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.getElementById("questions-modal").classList.remove("active");
+    });
+});
+
+// ===== Show Student Selector When "Specific Students" is selected =====
+const radioSpecific = document.getElementById("specific-radio");
+const selectorBox = document.getElementById("specific-student-selector");
+
+document.querySelectorAll(".access-radio").forEach(r => {
+    r.addEventListener("change", () => {
+        if (radioSpecific.checked) {
+            selectorBox.style.display = "block";
+        } else {
+            selectorBox.style.display = "none";
+        }
+    });
+});
+
+// ===== Open Student Selection Modal from Access Modal =====
+document.getElementById("open-student-selection")?.addEventListener("click", () => {
+    document.getElementById("exam-access-modal").classList.remove("active");
+    document.getElementById("student-selection-modal").classList.add("active");
+});
+
+
+// ================================
+// UPDATE SELECTED STUDENTS PREVIEW
+// ================================
+
+function updateSelectedPreview() {
+    const previewBox = document.getElementById("selected-students-preview");
+    const listEl = document.getElementById("selected-students-list");
+    const countEl = document.getElementById("selected-count");
+    const hiddenInput = document.getElementById("allowed-students-input");
+
+    const ids = hiddenInput.value
+        ? hiddenInput.value.split(",").map(x => x.trim()).filter(x => x !== "")
+        : [];
+
+    if (ids.length === 0) {
+        previewBox.style.display = "none";
+        return;
+    }
+
+    previewBox.style.display = "block";
+    countEl.textContent = ids.length;
+
+    listEl.innerHTML = "";
+
+    ids.forEach(id => {
+        const studentEl = document.querySelector(`[data-student-id='${id}']`);
+        if (studentEl) {
+            const name = studentEl.querySelector(".student-name")?.textContent || "Unknown";
+            const roll = studentEl.getAttribute("data-roll-id") || "N/A";
+
+            const li = document.createElement("li");
+            li.textContent = `${name} (Roll ${roll})`;
+            listEl.appendChild(li);
+        }
+    });
+}
+
+// Update preview whenever Access Modal opens
+document.querySelectorAll(".open-access-modal").forEach(btn => {
+    btn.addEventListener("click", () => {
+        updateSelectedPreview();
+    });
+});
+
+// Update preview after saving students
+document.getElementById("modal-save-btn")?.addEventListener("click", () => {
+    setTimeout(updateSelectedPreview, 300);
+});
+

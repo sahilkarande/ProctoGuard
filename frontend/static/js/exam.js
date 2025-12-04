@@ -72,6 +72,7 @@ function initExam(config) {
     ExamState.maxTabSwitches = config.maxTabSwitches || 3;
     ExamState.tabSwitchCount = config.initialTabSwitchCount || 0;
     ExamState.showTabSwitches = config.showTabSwitches !== false;
+    ExamState.examId = config.examId;
 
     if (typeof io !== 'undefined') {
         ExamState.socket = io();
@@ -137,6 +138,9 @@ function initExam(config) {
 function setupSocketHandlers() {
     if (!ExamState.socket) return;
 
+    // ----------------------------------------------------
+    // Standard Events
+    // ----------------------------------------------------
     ExamState.socket.on('calibration_result', (data) => {
         console.log("📸 Calibration result:", data);
         handleCalibrationResult(data);
@@ -149,6 +153,12 @@ function setupSocketHandlers() {
 
     ExamState.socket.on('connect', () => {
         console.log("✅ Socket connected");
+
+        // Join exam + student rooms when socket reconnects
+        ExamState.socket.emit("join_exam", {
+            exam_id: ExamState.examId,
+            student_exam_id: ExamState.studentExamId
+        });
     });
 
     ExamState.socket.on('disconnect', () => {
@@ -156,11 +166,77 @@ function setupSocketHandlers() {
         showNotification("Proctor connection lost. Attempting to reconnect...", "warning");
     });
 
-    // optional server heartbeat ack
-    ExamState.socket.on('heartbeat_ack', (d) => {
+    ExamState.socket.on('heartbeat_ack', () => {
         ExamState.lastSocketHeartbeat = Date.now();
     });
+
+
+    // ----------------------------------------------------
+    // REAL-TIME FORCE END — ENTIRE EXAM
+    // ----------------------------------------------------
+    ExamState.socket.on("exam_force_ended", (data) => {
+        console.warn("🚨 REAL-TIME EXAM FORCE END RECEIVED:", data);
+
+        if (data.exam_id !== ExamState.examId) return;
+
+        ExamState.isExamActive = false;
+
+        // Stop timers and proctoring
+        if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+        if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+
+        // Stop video streams
+        if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(t => t.stop());
+        if (ExamState.videoElement?.srcObject)
+            ExamState.videoElement.srcObject.getTracks().forEach(t => t.stop());
+        if (ExamState.studentCameraElement?.srcObject)
+            ExamState.studentCameraElement.srcObject.getTracks().forEach(t => t.stop());
+
+        showViolationPopup(
+            "Exam Force-Ended",
+            data.message || "The exam has been forcefully ended by faculty.",
+            () => submitExam(true)
+        );
+    });
+
+
+    // ----------------------------------------------------
+    // REAL-TIME FORCE END — THIS STUDENT ONLY
+    // ----------------------------------------------------
+    ExamState.socket.on("student_force_ended", (data) => {
+        if (data.student_exam_id !== ExamState.studentExamId) return;
+
+        console.warn("🚨 STUDENT FORCE END RECEIVED:", data);
+
+        ExamState.isExamActive = false;
+
+        // Stop everything
+        if (ExamState.timerInterval) clearInterval(ExamState.timerInterval);
+        if (ExamState.proctoringInterval) clearInterval(ExamState.proctoringInterval);
+
+        if (ExamState.videoStream) ExamState.videoStream.getTracks().forEach(t => t.stop());
+        if (ExamState.videoElement?.srcObject)
+            ExamState.videoElement.srcObject.getTracks().forEach(t => t.stop());
+        if (ExamState.studentCameraElement?.srcObject)
+            ExamState.studentCameraElement.srcObject.getTracks().forEach(t => t.stop());
+
+        showViolationPopup(
+            "Your Exam Was Ended",
+            data.message || "Faculty has force-ended your attempt.",
+            () => submitExam(true)
+        );
+    });
+
+
+    // ----------------------------------------------------
+    // JOIN ROOMS IMMEDIATELY ON LOAD
+    // ----------------------------------------------------
+    ExamState.socket.emit("join_exam", {
+        exam_id: ExamState.examId,
+        student_exam_id: ExamState.studentExamId
+    });
 }
+
 
 // CALIBRATION MODAL SYSTEM
 function showCalibrationModal() {

@@ -403,4 +403,16 @@ async function startStudentCamera() {
     }
 }
 </script>
+
+<script>
+initExam({
+    examId: {{ exam.id }},
+    studentExamId: {{ student_exam.id }},
+    timeRemaining: {{ remaining_time }},
+    maxTabSwitches: {{ exam.max_tab_switches }},
+    initialTabSwitchCount: {{ student_exam.tab_switch_count }},
+    showTabSwitches: true
+});
+</script>
+
 {% endblock %}

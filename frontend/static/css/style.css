@@ -13,6 +13,8 @@
   --primary-color: #6366f1;
   --primary-dark: #4f46e5;
   --primary-light: #818cf8;
+
+  --text-lite-version: rgb(0, 0, 0);
   
   /* Semantic Colors */
   --secondary-color: #10b981;
@@ -132,6 +134,8 @@
   /* Table specific - DARK */
   --table-header-bg: #14141c;
   --table-row-hover: rgba(99, 102, 241, 0.15);
+
+  
 }
 
 /* ===================================
@@ -650,7 +654,7 @@ body {
 
 .card-title {
   font-weight: 700;
-  color:  black;
+  color:  var(--text-lite-version);
   letter-spacing: -0.5px;
   font-size: 1.25rem;
   letter-spacing: 0.4px;
@@ -3460,7 +3464,7 @@ select {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  color: black;
+  color: var(--text-lite-version);
 }
 
 .modal-close-btn-students{
@@ -4154,7 +4158,7 @@ padding: 1.5rem;
 /* Header */
 .analytics-container thead th {
   background: var(--table-header-bg);
-  color:black;
+  color:var(--text-lite-version);
   font-weight: 600;
   text-align: left;
   padding: 1rem;
@@ -4169,7 +4173,7 @@ padding: 1.5rem;
 .analytics-container tbody td {
   padding: 1rem;
   border-bottom: 1px solid var(--border-color);
-  color: black;
+  color: var(--text-lite-version);
 }
 
 /* Row hover */
@@ -4198,7 +4202,7 @@ padding: 1.5rem;
   padding: 0.35rem 0.7rem;
   border-radius: 8px;
   font-size: 0.85rem;
-  color: black;
+  color: var(--text-lite-version);
   
 }
 
@@ -4552,14 +4556,14 @@ font-size: 1.8rem;
 
 .summary-label {
   font-size: 0.8rem;
-  color: black;
+  color: var(--text-lite-version);
   text-transform: uppercase;
 }
 
 .summary-value {
   font-size: 1.6rem;
   font-weight: 700;
-  color: black;
+  color: var(--text-lite-version);
 }
 
 [data-theme="dark"] .summary-label {    
@@ -4607,7 +4611,7 @@ font-size: 1.8rem;
 /* Text */
 .violation-type {
   font-weight: 600;
-  color:black;
+  color:var(--text-lite-version);
   font-size: 0.95rem;
   margin-bottom: 4px;
 }
@@ -6015,12 +6019,12 @@ tbody td {
   padding: 0.8rem 1.2rem;
   vertical-align: middle;
   font-size: 0.875rem;
-  color: black
+  color: var(--text-lite-version)
 }
 
 tbody td strong {
   font-weight: 700;
-  color: black; /* Ensures dark text in light mode */
+  color: var(--text-lite-version); /* Ensures dark text in light mode */
 }
 
 .badge {
@@ -6171,12 +6175,12 @@ tbody td strong {
 }
 
 [data-theme="light"] .student-name {
-    color: black;
+    color: var(--text-lite-version);
 }
 
 /* Dark theme styles */
 [data-theme="dark"] .student-name {
-    color: black;
+    color: var(--text-lite-version);
 }
 
 [data-theme="dark"] .student-prn {
@@ -6190,7 +6194,7 @@ tbody td strong {
   margin:0; 
   font-size:1.3rem; 
   font-weight:800;
-  color: black;
+  color: var(--text-lite-version);
 }
 
 [data-theme="dark"] .select-students {

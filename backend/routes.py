@@ -66,7 +66,7 @@ from models import StudentAnswer
 # ═══════════════════════════════════════════════════════════════════════
 # SOCKET.IO FOR BINARY PROCTORING
 # ═══════════════════════════════════════════════════════════════════════
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, join_room
 
 # Initialize Socket.IO (will be bound to app in register_routes)
 socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
@@ -1547,6 +1547,9 @@ def register_routes(app):
 
     # ============= Student Routes =============
 
+    # CORRECTED student_dashboard route
+    # Replace lines 1552-1597 in routes.py with this:
+
     @app.route('/student/dashboard')
     @login_required
     def student_dashboard():
@@ -1566,7 +1569,20 @@ def register_routes(app):
             status='in_progress'
         ).first()
         
+        # Fetch all active exams
         available_exams = Exam.query.filter(Exam.is_active == True).all()
+        
+        # ✅ GET ALL ATTEMPTED EXAM IDs for this student
+        attempted_exam_ids = set()
+        all_student_attempts = StudentExam.query.filter_by(student_id=current_user.id).all()
+        for attempt in all_student_attempts:
+            attempted_exam_ids.add(attempt.exam_id)
+        
+        # ✅ ADD attempted_by_current_user FLAG to each exam
+        for exam in available_exams:
+            exam.attempted_by_current_user = exam.id in attempted_exam_ids
+            exam.is_new = False  # You can add logic here if needed
+            exam.is_retake = False  # You can add logic here if needed
 
         # ✅ Filter valid percentages
         percentages = [se.percentage for se in completed_exams if se.percentage is not None]
@@ -3121,39 +3137,128 @@ def register_routes(app):
             traceback.print_exc()
             return jsonify({"error": str(e)}), 500
 
+    @socketio.on('join_exam')
+    def handle_join_exam(data):
+        try:
+            exam_id = data.get('exam_id')
+            student_exam_id = data.get('student_exam_id')
+
+            if exam_id:
+                room_name = f"exam_{exam_id}"
+                join_room(room_name)
+                print(f"Socket {request.sid} joined room {room_name}")
+
+            if student_exam_id:
+                student_room = f"student_exam_{student_exam_id}"
+                join_room(student_room)
+                print(f"Socket {request.sid} joined room {student_room}")
+
+        except Exception as e:
+            print("Error in join_exam:", e)
+
 
     @app.route('/faculty/exam/<int:exam_id>/force_end', methods=['POST'])
     @login_required
     def faculty_force_end_exam(exam_id):
+        # ---------- ACCESS CONTROL ----------
         if current_user.role != 'faculty':
             flash("Access denied", "error")
-            return redirect(url_for("student_dashboard"))
+            return redirect(url_for('student_dashboard'))
 
         exam = Exam.query.get_or_404(exam_id)
 
         if exam.creator_id != current_user.id:
-            flash("You cannot modify this exam", "error")
-            return redirect(url_for("faculty_dashboard"))
+            flash("Access denied", "error")
+            return redirect(url_for('faculty_dashboard'))
 
-        # mark exam ended
+        # ---------- FORCE-END FLAGS ----------
         exam.force_ended = True
-        exam.status = "ended"
-        exam.force_ended_at = datetime.utcnow()
+        exam.is_active = False
+        exam.status = "inactive"    # required for front-end exam block
 
-        # end all in-progress attempts
-        active_attempts = StudentExam.query.filter_by(exam_id=exam_id, status='in_progress').all()
+        # ---------- CLOSE ALL ACTIVE ATTEMPTS ----------
+        active_attempts = StudentExam.query.filter_by(
+            exam_id=exam_id,
+            status='in_progress'
+        ).all()
 
         for attempt in active_attempts:
-            attempt.status = 'submitted'
+            attempt.status = "submitted"
             attempt.submitted_at = datetime.utcnow()
 
-            # auto-score the exam
-            calculate_student_score(attempt.id)
+            # log every forced submission
+            log = ActivityLog(
+                student_exam_id=attempt.id,
+                activity_type="exam_force_ended",
+                description="Exam was force-ended by faculty",
+                severity="high",
+                created_at=datetime.utcnow()
+            )
+            db.session.add(log)
 
+        # ---------- COMMIT CHANGES ----------
         db.session.commit()
 
-        flash("⛔ Exam has been force-ended for all students.", "warning")
-        return redirect(url_for("view_exam", exam_id=exam_id))
+        # ---------- REAL-TIME BROADCAST TO ALL STUDENTS ----------
+        try:
+            socketio.emit(
+                'exam_force_ended',
+                {
+                    'exam_id': exam_id,
+                    'force_ended': True,
+                    'message': 'Faculty has force-ended the exam. Your exam will be submitted.'
+                },
+                room=f"exam_{exam_id}",
+                namespace='/'
+            )
+            print(f"🔔 Emitted exam_force_ended for exam_{exam_id}")
+        except Exception as e:
+            print("⚠️ Socket emit error:", e)
+
+        # ---------- RESPONSE ----------
+        flash("⚠ Exam has been force-ended for all students.", "warning")
+        return redirect(url_for('view_exam', exam_id=exam_id))
+
+
+    @app.route('/faculty/exam/<int:exam_id>/force_end_student/<int:student_exam_id>', methods=['POST'])
+    @login_required
+    def faculty_force_end_student(exam_id, student_exam_id):
+        if current_user.role != 'faculty':
+            flash("Access denied", "error")
+            return redirect(url_for('student_dashboard'))
+
+        exam = Exam.query.get_or_404(exam_id)
+        if exam.creator_id != current_user.id:
+            flash("Access denied", "error")
+            return redirect(url_for('faculty_dashboard'))
+
+        attempt = StudentExam.query.get_or_404(student_exam_id)
+
+        attempt.status = "submitted"
+        attempt.submitted_at = datetime.utcnow()
+
+        log = ActivityLog(
+            student_exam_id=attempt.id,
+            activity_type="student_force_ended",
+            description="Faculty force-ended this student's exam.",
+            severity="high",
+            created_at=datetime.utcnow()
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        # REAL-TIME SOCKET ALERT — ONLY THIS STUDENT
+        socketio.emit(
+            "student_force_ended",
+            {
+                "student_exam_id": student_exam_id,
+                "message": "Faculty has force-ended your exam."
+            },
+            room=f"student_exam_{student_exam_id}"
+        )
+
+        flash("Student exam force-ended.", "warning")
+        return redirect(url_for('view_exam', exam_id=exam_id))
 
 
 
@@ -3217,15 +3322,65 @@ def register_routes(app):
             exam = Exam.query.get_or_404(exam_id)
             exam.force_ended = False
             exam.status = 'active'
+            exam.is_active = True
             db.session.commit()
-            
+
+            # Notify any connected clients that exam is active again
+            socketio.emit('exam_reactivated', {
+                'exam_id': exam_id,
+                'message': 'Exam reactivated by faculty'
+            }, room=f"exam_{exam_id}")
+
             flash(f'✅ Exam "{exam.title}" has been reactivated.', 'success')
-            return redirect(url_for('faculty_dashboard'))  # ← CHANGED
-            
+            return redirect(url_for('faculty_dashboard'))
         except Exception as e:
             db.session.rollback()
             flash(f'❌ Error reactivating exam: {str(e)}', 'error')
             return redirect(url_for('faculty_dashboard'))
+
+    @socketio.on('join_exam')
+    def join_exam_room(data):
+        exam_id = data.get('exam_id')
+        student_exam_id = data.get('student_exam_id')
+
+        if exam_id:
+            join_room(f"exam_{exam_id}")
+            print(f"Student joined room exam_{exam_id}")
+
+        if student_exam_id:
+            join_room(f"student_exam_{student_exam_id}")
+            print(f"Student joined room student_exam_{student_exam_id}")
+
+
+    @app.route('/faculty/restart-student/<int:student_exam_id>', methods=['POST'])
+    @login_required
+    def faculty_restart_student(student_exam_id):
+        if current_user.role not in ['faculty', 'admin']:
+            return jsonify({'error':'unauthorized'}), 403
+        try:
+            se = StudentExam.query.get_or_404(student_exam_id)
+            # create a fresh StudentExam rather than editing old one (safer)
+            new_attempt = StudentExam(
+                student_id = se.student_id,
+                exam_id = se.exam_id,
+                started_at = None,
+                status = 'not_started',  # or allow logic you prefer
+                tab_switch_count = 0
+            )
+            db.session.add(new_attempt)
+            db.session.commit()
+
+            # tell that specific student (if connected)
+            socketio.emit('student_exam_restarted', {
+                'old_student_exam_id': student_exam_id,
+                'new_student_exam_id': new_attempt.id,
+                'message': 'Your exam has been restarted by faculty'
+            }, room=f"student_exam_{student_exam_id}")
+
+            return jsonify({'success': True, 'new_student_exam_id': new_attempt.id})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
 
 
     # ==========================================
