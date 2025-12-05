@@ -4,11 +4,7 @@
 {% block content %}
 <style>
   /* Enhanced Student Dashboard Styling */
-  .container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-  }
+
 
   /* Dashboard Header */
   .dashboard-header {
@@ -824,7 +820,7 @@
     <div class="welcome-section">
       <div>
         <div class="welcome-text">
-          <h1>Welcome back, {{ current_user.full_name or current_user.username }}! 👋</h1>
+          <h1>Welcome back, {{ current_user.full_name or current_user.username }}!</h1>
           <a href="{{ url_for('global_leaderboard') }}" class="btn-outline">
             <i class="bi bi-trophy"></i> Check out Class Status
           </a>
