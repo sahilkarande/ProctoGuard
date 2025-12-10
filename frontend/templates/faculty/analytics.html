@@ -222,7 +222,7 @@
                 <thead>
                     <tr>
                         <th><i class="bi bi-person"></i> Student</th>
-                        <th><i class="bi bi-envelope"></i> Email</th>
+                        
                         <th><i class="bi bi-calculator"></i> Score</th>
                         <th><i class="bi bi-percent"></i> Percentage</th>
                         <th><i class="bi bi-check-circle"></i> Status</th>
@@ -241,7 +241,7 @@
                             <br>
                             <small style="color: var(--text-secondary);">{{ se.student.prn_number or 'N/A' }}</small>
                         </td>
-                        <td>{{ se.student.email }}</td>
+                       
                         <td><strong>{{ se.score }}/{{ se.total_points }}</strong></td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -249,19 +249,25 @@
                                     <div class="progress-bar {{ 'success' if se.passed else 'danger' }}" 
                                         style="width: {{ se.percentage }}%"></div>
                                 </div>
-                                <strong>{{ "%.1f"|format(se.percentage) }}%</strong>
+                                <strong>{% if se.percentage is not none %}
+                                            {{ "%.1f"|format(se.percentage) }}%
+                                        {% else %}
+                                            0.0%
+                                        {% endif %}
+                                </strong>
                             </div>
                         </td>
                         <td>
                             {% if se.passed %}
-                            <span class="badge badge-success">
-                                <i class="bi bi-check-circle-fill"></i> Passed
-                            </span>
+                                <span class="badge badge-success">
+                                    <i class="bi bi-check-circle-fill mr-2"></i><span class="d-block mt-1">Passed</span>
+                                </span>
                             {% else %}
-                            <span class="badge badge-danger">
-                                <i class="bi bi-x-circle-fill"></i> Failed
-                            </span>
+                                <span class="badge badge-danger">
+                                    <i class="bi bi-x-circle-fill mr-2"></i><span class="d-block mt-1">Failed</span>
+                                </span>
                             {% endif %}
+
                         </td>
                         <td>{{ se.time_taken_minutes }} min</td>
                         <td>
@@ -289,12 +295,13 @@
                                     <i class="bi bi-info-circle"></i> {{ se.total_violations }}
                                 </span>
                                 {% endif %}
-                                <button class="btn btn-sm btn-outline-primary" 
-                                        onclick="viewViolations({{ se.id }}, '{{ se.student.full_name or se.student.username }}')"
-                                        title="View Violation Details"
-                                        style="margin-left: 8px; color: black;">
-                                    <i class="bi bi-eye"></i> View
-                                </button>
+                                    <button class="btn btn-outline-primary btn-view-violation" 
+                                            onclick="viewViolations({{ se.id }}, '{{ se.student.full_name or se.student.username }}')"
+                                            title="View Violation Details"
+                                            style="margin-left: 8px; color: black;">
+                                        <i class="bi bi-eye" style="color: black;"></i> View
+                                    </button>
+
                             {% else %}
                             <span class="badge badge-success">
                                 <i class="bi bi-check-circle"></i> 0

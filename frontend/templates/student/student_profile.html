@@ -2,51 +2,139 @@
 {% block title %}Student Profile - {{ student.full_name }}{% endblock %}
 
 {% block content %}
-<style>
-</style>
 <div class="container">
     <!-- Back Button -->
     <div style="margin-bottom: 1.5rem;">
-
+        <a href="{{ url_for('faculty_dashboard') }}" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+            <i class="bi bi-arrow-left"></i>
+            Back to Dashboard
+        </a>
     </div>
 
-    <!-- Student Profile Header -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-                <a href="#" class="student-info">
+    <!-- ===================================
+         ENHANCED STUDENT BANNER
+         =================================== -->
+    <div class="student-banner">
+        <div class="student-banner-content">
+            <!-- Left Section: Avatar + Info -->
+            <div class="student-banner-left">
+                <!-- Profile Avatar with Initials -->
+                <div class="student-avatar">
+                    {% set name_parts = (student.full_name or student.username).split() %}
+                    
+                    <div class="student-avatar-placeholder">
+
+                        {% if student.gender == "Male" %}
+                            <img src="{{ url_for('static', filename='images/Male.png') }}" 
+                                class="avatar-gender-image" 
+                                alt="Male">
+
+                        {% elif student.gender == "Female" %}
+                            <img src="{{ url_for('static', filename='images/Female.png') }}" 
+                                class="avatar-gender-image" 
+                                alt="Female">
+
+                        {% else %}
+                            {% if name_parts|length > 1 %}
+                                {{ name_parts[0][0] }}{{ name_parts[-1][0] }}
+                            {% else %}
+                                {{ name_parts[0][0] }}{{ name_parts[0][1] if name_parts[0]|length > 1 else '' }}
+                            {% endif %}
+                        {% endif %}
+
+                    </div>
+
+                    <!-- Status Badge -->
+                    <div class="student-avatar-badge"></div>
+                </div>
+                
+                <!-- Student Information -->
+                <div class="student-info">
                     <h2 class="student-name">
-                        <i class="bi bi-person-circle"></i> {{ student.full_name or student.username }}
+                        {{ student.full_name or student.username }}
                     </h2>
                     <p class="student-prn">
-                        <i class="bi bi-hash"></i> {{ student.prn_number or 'N/A' }}
+                        <i class="bi bi-hash"></i> 
+                        {{ student.prn_number or 'N/A' }}
                     </p>
-                </a>
-
-
+                </div>
             </div>
             
-            <!-- Password Reset Button -->
-            <button class="btn btn-danger" onclick="openPasswordModal()" style="display: flex; align-items: center; gap: 8px;">
-                <i class="bi bi-key-fill"></i>
-                Reset Password
-            </button>
+            <!-- Right Section: Status + Actions -->
+            <div class="student-banner-right">
+                <!-- Verification Status Badge -->
+                {% if student.is_verified %}
+                    <div class="student-status-badge active">
+                        <i class="bi bi-check-circle-fill"></i>
+                        Verified
+                    </div>
+                {% else %}
+                    <div class="student-status-badge inactive">
+                        <i class="bi bi-clock-fill"></i>
+                        Pending
+                    </div>
+                {% endif %}
+                
+                <!-- Reset Password Button -->
+                <button class="student-action-btn" onclick="openPasswordModal()">
+                    <i class="bi bi-key-fill"></i>
+                    Reset Password
+                </button>
+            </div>
         </div>
+        
+        <!-- Optional: Extended Details Grid -->
+        {% if student_exams %}
+        <div class="student-details-grid">
+            <div class="student-detail-item">
+                <div class="student-detail-label">Total Exams</div>
+                <div class="student-detail-value">{{ student_exams|length }}</div>
+            </div>
+            <div class="student-detail-item">
+                <div class="student-detail-label">Completed</div>
+                <div class="student-detail-value">
+                    {{ student_exams|selectattr('completed')|list|length }}
+                </div>
+            </div>
+            <div class="student-detail-item">
+                <div class="student-detail-label">Average Score</div>
+                <div class="student-detail-value">
+                    {% set total_percentage = student_exams|map(attribute='percentage')|select|sum %}
+                    {% set count = student_exams|selectattr('percentage')|list|length %}
+                    {% if count > 0 %}
+                        {{ "%.1f"|format(total_percentage / count) }}%
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </div>
+            </div>
+            <div class="student-detail-item">
+                <div class="student-detail-label">Password Status</div>
+                <div class="student-detail-value">
+                    {% if student.password_changed %}
+                        <span style="color: #d1fae5;">✓ Changed</span>
+                    {% else %}
+                        <span style="color: #fde68a;">⚠ Must Change</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Student Information Card -->
     <div class="card" style="margin-bottom: 2rem;">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="bi bi-info-circle"></i> Student Information
+                <i class="bi bi-info-circle-fill"></i> Student Information
             </h3>
         </div>
         <div class="card-body">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
                 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-person-badge"></i> Full Name
+                        <i class="bi bi-person-badge-fill"></i> Full Name
                     </div>
                     <div class="info-value">{{ student.full_name or 'N/A' }}</div>
                 </div>
@@ -60,7 +148,7 @@
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-envelope"></i> Email
+                        <i class="bi bi-envelope-fill"></i> Email
                     </div>
                     <div class="info-value">{{ student.email }}</div>
                 </div>
@@ -74,21 +162,21 @@
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-calendar-event"></i> Batch
+                        <i class="bi bi-calendar-event-fill"></i> Batch
                     </div>
                     <div class="info-value">{{ student.batch or 'N/A' }}</div>
                 </div>
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-building"></i> Department
+                        <i class="bi bi-building-fill"></i> Department
                     </div>
                     <div class="info-value">{{ student.department or 'N/A' }}</div>
                 </div>
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-phone"></i> Phone
+                        <i class="bi bi-phone-fill"></i> Phone
                     </div>
                     <div class="info-value">{{ student.phone or 'N/A' }}</div>
                 </div>
@@ -102,7 +190,7 @@
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-shield-check"></i> Verification Status
+                        <i class="bi bi-shield-check-fill"></i> Verification Status
                     </div>
                     <div class="info-value">
                         {% if student.is_verified %}
@@ -119,7 +207,7 @@
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-key"></i> Password Status
+                        <i class="bi bi-key-fill"></i> Password Status
                     </div>
                     <div class="info-value">
                         {% if student.password_changed %}
@@ -136,9 +224,16 @@
 
                 <div class="info-item">
                     <div class="info-label">
-                        <i class="bi bi-calendar-plus"></i> Registered
+                        <i class="bi bi-calendar-plus-fill"></i> Registered
                     </div>
-                    <div class="info-value">{{ student.created_at.strftime('%d %b, %Y') if student.created_at else 'N/A' }}</div>
+                    <div class="info-value">{{ student.created_at.strftime('%d %b, %Y at %I:%M %p') if student.created_at else 'N/A' }}</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-label">
+                        <i class="bi bi-clock-history"></i> Last Updated
+                    </div>
+                    <div class="info-value">{{ student.updated_at.strftime('%d %b, %Y at %I:%M %p') if student.updated_at else 'N/A' }}</div>
                 </div>
 
             </div>
@@ -150,10 +245,10 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="bi bi-graph-up"></i> Exam Performance
+                <i class="bi bi-graph-up-arrow"></i> Exam Performance
             </h3>
-            <span class="badge" style="background: var(--primary-color);">
-                {{ student_exams|length }} Exams Taken
+            <span class="badge" style="background: var(--primary-color); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600;">
+                <i class="bi bi-file-earmark-text-fill"></i> {{ student_exams|length }} Exams Taken
             </span>
         </div>
         <div class="card-body">
@@ -161,31 +256,31 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Exam Title</th>
-                            <th>Score</th>
-                            <th>Percentage</th>
-                            <th>Status</th>
-                            <th>Time Taken</th>
-                            <th>Violations</th>
-                            <th>Submitted</th>
+                            <th><i class="bi bi-journal-text"></i> Exam Title</th>
+                            <th><i class="bi bi-123"></i> Score</th>
+                            <th><i class="bi bi-percent"></i> Percentage</th>
+                            <th><i class="bi bi-check-circle"></i> Status</th>
+                            <th><i class="bi bi-clock"></i> Time Taken</th>
+                            <th><i class="bi bi-exclamation-triangle"></i> Violations</th>
+                            <th><i class="bi bi-calendar"></i> Submitted</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for se in student_exams %}
-                        <tr>
+                        <tr {% if not se.passed %}style="background: rgba(239, 68, 68, 0.05);"{% endif %}>
                             <td>
-                                <strong>{{ se.exam.title }}</strong>
+                                <strong style="color: var(--text-primary);">{{ se.exam.title }}</strong>
                             </td>
                             <td>
-                                <strong>{{ se.score or 0 }}/{{ se.total_points or 0 }}</strong>
+                                <strong style="font-family: 'Courier New', monospace;">{{ se.score or 0 }}/{{ se.total_points or 0 }}</strong>
                             </td>
                             <td>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <div class="progress-container" style="width: 100px;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div class="progress-container" style="width: 100px; height: 8px;">
                                         <div class="progress-bar {{ 'success' if se.passed else 'danger' }}" 
                                              style="width: {{ se.percentage or 0 }}%;"></div>
                                     </div>
-                                    <strong>{{ "%.1f"|format(se.percentage or 0) }}%</strong>
+                                    <strong style="font-size: 0.95rem; min-width: 50px;">{{ "%.1f"|format(se.percentage or 0) }}%</strong>
                                 </div>
                             </td>
                             <td>
@@ -199,29 +294,34 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td>{{ se.time_taken_minutes or 'N/A' }} min</td>
                             <td>
-                                {% if se.total_violations %}
-                                    {% if se.total_violations >= 6 %}
-                                        <span class="badge badge-danger">
-                                            <i class="bi bi-exclamation-circle-fill"></i> {{ se.total_violations }}
-                                        </span>
-                                    {% elif se.total_violations >= 3 %}
-                                        <span class="badge badge-warning">
-                                            <i class="bi bi-exclamation-triangle"></i> {{ se.total_violations }}
-                                        </span>
+                                <span style="font-family: 'Courier New', monospace; color: var(--text-secondary);">
+                                    {% if se.time_taken %}
+                                        {{ (se.time_taken // 60)|int }}m {{ se.time_taken % 60 }}s
                                     {% else %}
-                                        <span class="badge badge-info">
-                                            <i class="bi bi-info-circle"></i> {{ se.total_violations }}
-                                        </span>
+                                        N/A
                                     {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if se.violation_count > 0 %}
+                                    <span class="badge badge-warning" style="cursor: pointer;" 
+                                          onclick="alert('{{ se.violation_count }} violations detected during this exam')">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> {{ se.violation_count }}
+                                    </span>
                                 {% else %}
                                     <span class="badge badge-success">
-                                        <i class="bi bi-check-circle"></i> 0
+                                        <i class="bi bi-shield-check"></i> None
                                     </span>
                                 {% endif %}
                             </td>
-                            <td>{{ se.submitted_at.strftime('%d %b, %H:%M') if se.submitted_at else 'N/A' }}</td>
+                            <td>
+                                <span style="color: var(--text-secondary); font-size: 0.875rem;">
+                                    {{ se.submitted_at.strftime('%d %b, %Y') if se.submitted_at else 'N/A' }}
+                                    <br>
+                                    <small style="opacity: 0.7;">{{ se.submitted_at.strftime('%I:%M %p') if se.submitted_at else '' }}</small>
+                                </span>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -230,11 +330,23 @@
         </div>
     </div>
     {% else %}
+    <!-- No Exams Card -->
     <div class="card">
-        <div class="card-body text-center" style="padding: 3rem;">
-            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;">📝</div>
-            <h3 style="margin-bottom: 0.5rem;">No Exams Taken Yet</h3>
-            <p style="color: var(--text-secondary);">This student hasn't taken any exams yet.</p>
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-graph-up-arrow"></i> Exam Performance
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-inbox"></i>
+                </div>
+                <h4 class="empty-state-title">No Exams Taken Yet</h4>
+                <p class="empty-state-text">
+                    This student hasn't taken any exams yet. Exam performance data will appear here once they complete their first exam.
+                </p>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -290,7 +402,7 @@
                        oninput="validatePasswordMatch()">
             </div>
 
-            <div id="passwordMatchStatus" style="margin-bottom: 1rem; font-size: 0.9rem; display: none;"></div>
+            <div id="passwordMatchStatus" style="display: none;"></div>
 
             <button type="submit" class="btn-reset-password" id="submitBtn">
                 <i class="bi bi-shield-check"></i>
@@ -314,6 +426,7 @@
         document.getElementById('passwordModal').classList.remove('active');
         document.getElementById('passwordResetForm').reset();
         document.getElementById('passwordMatchStatus').style.display = 'none';
+        document.getElementById('passwordMatchStatus').className = '';
     }
 
     // Close on outside click
@@ -331,7 +444,7 @@
         }
     });
 
-    // Validate password match in real-time
+    // Validate password match in real-time with enhanced styling
     function validatePasswordMatch() {
         const newPassword = document.getElementById('new_password').value;
         const confirmPassword = document.getElementById('confirm_password').value;
@@ -340,19 +453,24 @@
         
         if (confirmPassword.length === 0) {
             statusDiv.style.display = 'none';
+            statusDiv.className = '';
             submitBtn.disabled = false;
             return;
         }
         
         statusDiv.style.display = 'block';
         
-        if (newPassword === confirmPassword) {
-            statusDiv.innerHTML = '<span style="color: #10b981;"><i class="bi bi-check-circle-fill"></i> Passwords match</span>';
-            statusDiv.style.color = '#10b981';
+        if (newPassword.length < 6) {
+            statusDiv.className = 'warning';
+            statusDiv.textContent = 'Password must be at least 6 characters';
+            submitBtn.disabled = true;
+        } else if (newPassword === confirmPassword) {
+            statusDiv.className = 'match';
+            statusDiv.textContent = 'Passwords match!';
             submitBtn.disabled = false;
         } else {
-            statusDiv.innerHTML = '<span style="color: #ef4444;"><i class="bi bi-x-circle-fill"></i> Passwords do not match</span>';
-            statusDiv.style.color = '#ef4444';
+            statusDiv.className = 'no-match';
+            statusDiv.textContent = 'Passwords do not match';
             submitBtn.disabled = true;
         }
     }
@@ -387,8 +505,10 @@
         }
         
         // Disable button and show loading
+        const originalHTML = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Resetting Password...';
+        submitBtn.classList.add('loading');
+        submitBtn.innerHTML = '<span>Resetting Password...</span>';
         
         try {
             const formData = new FormData();
@@ -407,17 +527,21 @@
                 closePasswordModal();
                 
                 // Update password status badge on page
-                location.reload();
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
             } else {
                 alert('❌ ' + data.message);
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+                submitBtn.classList.remove('loading');
+                submitBtn.innerHTML = originalHTML;
             }
         } catch (error) {
             console.error('Error:', error);
             alert('❌ An error occurred: ' + error.message);
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="bi bi-shield-check"></i> Reset Password';
+            submitBtn.classList.remove('loading');
+            submitBtn.innerHTML = originalHTML;
         }
     });
 
@@ -430,7 +554,7 @@
     });
 
     document.getElementById('confirm_password').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !document.getElementById('submitBtn').disabled) {
             e.preventDefault();
             document.getElementById('passwordResetForm').dispatchEvent(new Event('submit'));
         }

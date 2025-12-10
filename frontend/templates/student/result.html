@@ -35,7 +35,7 @@
                 <div class="stat-card">
                     {% set color = 'var(--secondary-color)' if student_exam.passed else 'var(--danger-color)' %}
                     <div class="stat-value" style="color: {{ color }};">
-                        {{ "%.2f"|format(student_exam.percentage) }}%
+                        {{ "%.2f"|format(student_exam.percentage or 0) }}%
                     </div>
                     <div class="stat-label">Percentage</div>
                 </div>

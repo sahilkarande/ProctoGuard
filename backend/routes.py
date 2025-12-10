@@ -11,7 +11,7 @@ import io
 import json
 import random
 import sqlite3
-import traceback
+
 from datetime import datetime
 from io import StringIO, BytesIO
 import base64
@@ -1194,7 +1194,7 @@ def register_routes(app):
         passed = len([se for se in student_exams if se.passed])
         failed = total_attempts - passed
         
-        avg_score = sum([se.percentage for se in student_exams]) / total_attempts if total_attempts > 0 else 0
+        avg_score = sum([se.percentage for se in student_exams if se.percentage is not None]) / total_attempts if total_attempts > 0 else 0
         avg_time = sum([se.time_taken_minutes for se in student_exams if se.time_taken_minutes]) / total_attempts if total_attempts > 0 else 0
         
         questions = Question.query.filter_by(exam_id=exam_id).order_by(Question.order_number).all()
@@ -1523,8 +1523,9 @@ def register_routes(app):
         
         total_exams = len(student_exams)
         passed_exams = len([se for se in student_exams if se.passed])
-        failed_exams = total_attempts - passed_exams
-        avg_score = sum([se.percentage for se in student_exams]) / total_exams if total_exams > 0 else 0
+        failed_exams = total_exams - passed_exams
+        valid_scores = [se.percentage for se in student_exams if se.percentage is not None]
+        avg_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0
         avg_time = sum([se.time_taken_minutes for se in student_exams if se.time_taken_minutes]) / total_exams if total_exams > 0 else 0
         
         recent_exams = student_exams[:10]
@@ -2347,10 +2348,11 @@ def register_routes(app):
 
         completed_exams = student_exams
         total_exams = len(completed_exams)
-        avg_score = sum(se.percentage for se in completed_exams) / total_exams if total_exams else 0
+        valid_scores = [se.percentage for se in completed_exams if se.percentage is not None]
+        avg_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0
         passed_exams = [se for se in completed_exams if se.passed]
         pass_rate = (len(passed_exams) / total_exams * 100) if total_exams else 0
-        best_score = max((se.percentage for se in completed_exams), default=0)
+        best_score = max(valid_scores) if valid_scores else 0
 
         return render_template(
             'student/student_profile.html',
