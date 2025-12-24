@@ -9,10 +9,11 @@
     <!-- Dashboard Header -->
     <div style="margin-bottom: 2rem;">
         <div class="flex-between mb-4">
-            <div>
-                <a class="facultyheader" >📊 Faculty Dashboard</a> <br>
-                <a style="color: var(--text-secondary);">Manage your exams and monitor student performance</a>
+            <div class="faculty-section">
+                <a class="facultyheader">📊 Faculty Dashboard</a>
+                <a class="facultydasdescription">Manage your exams and monitor student performance</a>
             </div>
+
 <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
     <a href="{{ url_for('create_exam') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> Create New Exam
@@ -64,7 +65,8 @@
             <h2 class="card-title">Your Exams</h2>
         </div>
 
-        <table class="table">
+        <div class="table-responsive">
+            <table class="table">
             <thead>
                 <tr>
                     <th>Title</th>
@@ -109,8 +111,10 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+            </table>
+        </div> 
     </div>
+
     {% else %}
     <div class="card text-center">
         <div style="padding: 3rem 0;">

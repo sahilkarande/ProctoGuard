@@ -106,22 +106,26 @@
                 <div class="container">
                     {% for category, message in messages %}
                         <div class="alert alert-{{ category }}" role="alert">
-                            <div class="alert-content">
-                                {% if category == 'success' %}
-                                    <i class="bi bi-check-circle-fill"></i>
-                                {% elif category == 'error' %}
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                {% elif category == 'warning' %}
-                                    <i class="bi bi-exclamation-triangle-fill"></i>
-                                {% else %}
-                                    <i class="bi bi-info-circle-fill"></i>
-                                {% endif %}
-                                <span>{{ message }}</span>
-                            </div>
-                            <button class="alert-close" onclick="this.parentElement.remove()" aria-label="Close alert">
-                                <i class="bi bi-x"></i>
-                            </button>
-                        </div>
+    <div class="alert-body">
+        <div class="alert-content">
+            {% if category == 'success' %}
+                <i class="bi bi-check-circle-fill"></i>
+            {% elif category == 'error' %}
+                <i class="bi bi-exclamation-circle-fill"></i>
+            {% elif category == 'warning' %}
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            {% else %}
+                <i class="bi bi-info-circle-fill"></i>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+
+        <button class="alert-close" onclick="this.closest('.alert').remove()" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+</div>
+
                     {% endfor %}
                 </div>
             {% endif %}

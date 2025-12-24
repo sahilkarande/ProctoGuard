@@ -1,120 +1,114 @@
 {% extends "base.html" %}
 
-{% block title %}CDAC Proctored Exam Platform{% endblock %}
+{% block title %}ProctoGuard – CDAC Proctored Exam Platform{% endblock %}
 
-{% block content %}
-<div class="container">
-    <main>
-        <section class="hero">
-            <div class="cdac-logo-group">
-                <img 
-                    id="cdac-logo"
-                    src="static/images/Lite_Theme_logo.png"  
-                    alt="CDAC Logo"
-                    class="cdac-logo-english"
-                >
-                <div class="logo-stack">
-                    <img src="static/images/applogo.png" alt="ProctoGuard Logo" class="proctoguard-logo">
-                </div>
+{% block content %}<div class="pg-wrap">
+
+    <!-- HERO -->
+    <section class="pg-hero">
+        
+
+        <div class="pg-hero-content">
+            <div class="pg-logos">
+                <img id="cdac-logo" class="pg-cdac" src="static/images/Lite_Theme_logo.png">
+                <img src="static/images/applogo.png" class="pg-app">
             </div>
-            
-            <a class="applogo">ProctoGuard</a> <br>
-            <a class="appdesc">AI-powered online examination system designed for educational excellence</a>
-        </section>
-    </main>
 
-    <section class="grid grid-3 mt-4">
-        <div class="card text-center feature-card">
-            <div class="feature-icon">🤖</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">AI Enhancement</h3>
-            <p style="color: var(--text-secondary);">Automatically refine and format questions with AI for clarity and accuracy</p>
-        </div>
-        
-        <div class="card text-center feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Secure Proctoring</h3>
-            <p style="color: var(--text-secondary);">Advanced monitoring to ensure exam integrity and prevent malpractice</p>
-        </div>
-        
-        <div class="card text-center feature-card">
-            <div class="feature-icon">📊</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Analytics Dashboard</h3>
-            <p style="color: var(--text-secondary);">Track performance with detailed visual reports for students and faculty</p>
-        </div>
-
-        <div class="card text-center feature-card">
-            <div class="feature-icon">⚡</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Real-Time Results</h3>
-            <p style="color: var(--text-secondary);">Instant evaluation and insights for every participant</p>
-        </div>
-
-        <div class="card text-center feature-card">
-            <div class="feature-icon">🌐</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Cloud-Based Access</h3>
-            <p style="color: var(--text-secondary);">Seamless access anywhere with secure cloud deployment</p>
-        </div>
-
-        <div class="card text-center feature-card">
-            <div class="feature-icon">📱</div>
-            <h3 style="color: var(--primary-color); margin-bottom: 1rem;">Mobile Friendly</h3>
-            <p style="color: var(--text-secondary);">Fully responsive interface for desktop, tablet, and mobile devices</p>
+            <h1 class="pg-heading">ProctoGuard</h1>
+            <p class="pg-tagline">
+                AI-powered proctored examination platform for secure digital education
+            </p>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="card mt-4">
-        <div class="card-header">
-            <h2 class="card-title">Platform Highlights</h2>
-            <p class="card-subtitle">Tailored for institutions and learners alike</p>
-        </div>
-        
-        <div class="grid grid-2">
-            <div>
-                <h3 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem;">For Faculty</h3>
-                <ul style="list-style: none; color: var(--text-secondary);">
-                    <li>✅ Intuitive exam creation and question management</li>
-                    <li>✅ Upload questions via CSV, Excel, or JSON</li>
-                    <li>✅ AI-powered question enhancement</li>
-                    <li>✅ View activity logs and suspicious events</li>
-                    <li>✅ Download analytics and performance PDFs</li>
-                </ul>
+    <!-- FEATURES -->
+    <section class="pg-feature-section">
+        <div class="pg-feature-grid">
+
+            <div class="pg-feature">
+                <span>🤖</span>
+                <h3>AI Enhancement</h3>
+                <p>Smart question refinement and formatting with AI intelligence.</p>
             </div>
-            
-            <div>
-                <h3 style="color: var(--primary-color); margin-bottom: 1rem; font-size: 1.25rem;">For Students</h3>
-                <ul style="list-style: none; color: var(--text-secondary);">
-                    <li>✅ Simple, distraction-free exam interface</li>
-                    <li>✅ Auto-save answers with countdown timer</li>
-                    <li>✅ Instant result generation</li>
-                    <li>✅ Compare performance with class average</li>
-                    <li>✅ Download detailed performance reports</li>
-                </ul>
+
+            <div class="pg-feature">
+                <span>🔒</span>
+                <h3>Secure Proctoring</h3>
+                <p>Real-time monitoring and anomaly detection.</p>
             </div>
+
+            <div class="pg-feature">
+                <span>📊</span>
+                <h3>Analytics</h3>
+                <p>Detailed performance dashboards and insights.</p>
+            </div>
+
+            <div class="pg-feature">
+                <span>⚡</span>
+                <h3>Instant Results</h3>
+                <p>Live evaluation with downloadable reports.</p>
+            </div>
+
+            <div class="pg-feature">
+                <span>🌐</span>
+                <h3>Cloud Based</h3>
+                <p>Secure global access across devices.</p>
+            </div>
+
+            <div class="pg-feature">
+                <span>📱</span>
+                <h3>Mobile Friendly</h3>
+                <p>Optimized for mobile, tablet and desktop.</p>
+            </div>
+
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer style="margin-top: 3rem; text-align: center; padding: 1.5rem 0; color: var(--text-secondary); border-top: 1px solid var(--border-color);">
-        <p>CDAC Education & Training Department | All Rights Reserved</p>
-        <p style="font-size: 0.9rem;">Empowering digital learning through innovation and technology</p>
-    </footer>
+    <!-- AUDIENCE -->
+    <section class="pg-audience">
+        <div class="pg-audience-card">
+            <h3>Faculty</h3>
+            <ul>
+                <li>AI exam creation</li>
+                <li>Malpractice detection</li>
+                <li>Exportable reports</li>
+                <li>Live monitoring</li>
+            </ul>
+        </div>
+
+        <div class="pg-audience-card">
+            <h3>Students</h3>
+            <ul>
+                <li>Clean exam interface</li>
+                <li>Auto save answers</li>
+                <li>Instant results</li>
+                <li>Performance comparison</li>
+            </ul>
+        </div>
+    </section>
+
+</div>
+
 
 </div>
 
 <script>
+function updateCdacLogo(){
+    const logo = document.getElementById("cdac-logo");
+    if(!logo) return;
 
-    window.addEventListener('DOMContentLoaded', (event) => {
-        const logoImage = document.getElementById('cdac-logo');
+    const theme = document.documentElement.getAttribute("data-theme");
+    logo.src = theme === "dark"
+        ? "static/images/Dark_Theme_logo.png"
+        : "static/images/Lite_Theme_logo.png";
+}
 
-        if (currentTheme === 'dark') {
-            logoImage.src = 'static/images/Dark_Theme_logo.png';
-        } else if (currentTheme === 'light') {
-            logoImage.src = 'static/images/Lite_Theme_logo.png';
-        }
+/* Initial */
+updateCdacLogo();
 
-
-        document.documentElement.setAttribute('data-theme', currentTheme);
-    });
+/* Watch for theme changes */
+const observer = new MutationObserver(updateCdacLogo);
+observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 </script>
 
 {% endblock %}
